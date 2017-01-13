@@ -70,11 +70,12 @@ csv = ''
 #   h,v,d are cumulative horiz, vert, and slope distance
 #   their increments are dh,dv,dd
 
-hv = [] # array of [h,dh,dv,dd]
+hv = [] # array of [h,v]
 first=true
 x,y,z = 0,0,0
 i=0
 h=0
+v=0
 cartesian.each { |p|
   r,x2,y2,z2 = p
   if first then 
@@ -84,15 +85,11 @@ cartesian.each { |p|
     dl2 = dx*dx+dy*dy+dz*dz
     dv = (dx*x+dy*y+dz*z)/r # dot product of dr with rhat = vertical distance
     dh = Math::sqrt(dl2-dv*dv) # horizontal distance
-    dd = Math::sqrt(dl2)
     h = h+dh
-    if false then
-      print "dx,dy,dz=#{dx},#{dy},#{dz}\n"
-      print "rhat=#{x/r},#{y/r},#{z/r}\n"
-    end
-    hv.push([h,dh,dv,dd])
-    #print "dh,dv=#{dh},#{dv}\n"
+    v = v+dv
   end
+  hv.push([h,v]) # in first iteration, is [0,0]
+  # if i<10 then print "#{"%9.2f" % [h]},#{"%9.2f" % [v]}\n" end
   x,y,z=x2,y2,z2
   i = i+1
 }
@@ -103,31 +100,39 @@ cartesian.each { |p|
 osc_h = 500 # typical wavelength, in meters, of bogus oscillations
 hv2 = []
 hv.each { |a|
-  h,dh,dv,dd = a
+  h,v = a
 
-  if false then
-  h0 = a[0]
-  hv.each { |b|
-    h,dh,dv,dd = b
-    if Math::abs(h-h0<osc_h/2.0) then end
-  }
-  end
+  #h0 = a[0]
+  #hv.each { |b|
+  #  h,dh,dv,dd = b
+  #  if Math::abs(h-h0<osc_h/2.0) then end
+  #}
 
-  hv2.push([dh,dv,dd])
+  hv2.push([h,v])
 }
+hv = hv2
 
 # integrate...
 h = 0 # total horizontal distance
 v = 0 # total vertical distance (=0 at end of a loop)
 d = 0 # total distance along the slope
 gain = 0 # total gain
-hv2.each { |a|
-  dh,dv,dd = a
-  h = h+dh
-  v = v+dv
-  d = d+dd
-  if dv>0 then gain=gain+dv end
-  csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]}\n"
+first = true
+old_h = 0
+old_v = 0
+hv.each { |a|
+  h,v = a
+  if !first then
+    dh = h-old_h
+    dv = v-old_v
+    dd = Math::sqrt(dh*dh+dv*dv)
+    d = d+dd
+    if dv>0 then gain=gain+dv end
+    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]}\n"
+  end
+  old_h = h
+  old_v = v
+  first = false
 }
 
 
