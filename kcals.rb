@@ -1,18 +1,54 @@
 #!/usr/bin/ruby
 
-# reads stdin
-# writes kcals.csv and total stats to output
+# See README.md for documentation.
 
 # to do: out and back option/detection
+
+command_line_parameters=ARGV
+
+def fatal_error(message)
+  $stderr.print "whiz.rb: #{$verb} fatal error: #{message}\n"
+  exit(-1)
+end
 
 $metric = false
 $running = true # set to false for walking
 $body_mass = 66 # in kg, =145 lb
-
-osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height data
+$osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height data
             # calculated gain is very sensitive to this
             # putting in this value, which I estimated by eye from a graph, seems to reproduce
             # mapmyrun's figure for total gain
+
+def handle_param(s,where)
+  if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
+    par,value = $1,$2
+    recognized = false
+    if par=='metric' then recognized=true; $metric=(value.to_i==1) end
+    if par=='running' then recognized=true; $running=(value.to_i==1) end
+    if par=='weight' then recognized=true; $body_mass=value.to_f end
+    if par=='filtering' then recognized=true; $osc_h=value.to_f end
+    if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
+  else
+    fatal_error("illegal syntax#{where}:\n#{s}")
+  end
+end
+
+# first read from prefs file:
+prefs = "#{Dir.home}/.kcals"
+begin
+  open(prefs,'r') { |f|
+    f.each_line {|line|
+      next if line=~/\A\s*\Z/
+      handle_param(line," in #{prefs}")
+    }
+  }
+rescue
+  print "Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.\n"
+end
+# then override at command line:
+command_line_parameters.each { |p| handle_param(p,'') }
+
+print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m\n"
 
 # For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
 
@@ -31,11 +67,6 @@ def minetti_cw(i)
   # i = gradient
   # cr = cost of walking, in J/kg.m
   return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
-end
-
-def fatal_error(message)
-  $stderr.print "whiz.rb: #{$verb} fatal error: #{message}\n"
-  exit(-1)
 end
 
 def deg_to_rad(x)
@@ -92,7 +123,7 @@ $stdin.each_line { |line|
 
 n = cartesian.length
 
-print "points read = #{n}\n"
+#print "points read = #{n}\n"
 if n==0 then $stderr.print "error, no points read successfully from input\n"; exit(-1) end
 
 csv = ''
@@ -136,8 +167,7 @@ hv.each { |a|
   n_av = 0
   hv.each { |b|
     hh,vv = b
-    # if hh<100.0 then print "-------> #{hh}, #{(hh-h).abs}\n" end # qwe
-    if (hh-h).abs<osc_h/2.0 then
+    if (hh-h).abs<$osc_h/2.0 then
       # print " yes\n"
       v_av = v_av+vv
       n_av = n_av+1
