@@ -6,6 +6,37 @@
 # to do: out and back option/detection
 
 $metric = false
+$running = true # set to false for walking
+$body_mass = 66 # in kg, =145 lb
+
+osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height data
+            # calculated gain is very sensitive to this
+            # putting in this value, which I estimated by eye from a graph, seems to reproduce
+            # mapmyrun's figure for total gain
+
+# For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
+
+def minetti(i)
+  if $running then return minetti_cr(i) else return minetti_cw(i) end
+end
+
+def minetti_cr(i)
+  # i = gradient
+  # cr = cost of running, in J/kg.m
+  return 155.4*i**5-30.4*i**4-43.3*i**3+46.3*i**2+19.5*i+3.6
+  # note that the 3.6 is different from their best value of 3.4 on the flats, i.e., the polynomial isn't a perfect fit
+end
+
+def minetti_cw(i)
+  # i = gradient
+  # cr = cost of walking, in J/kg.m
+  return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
+end
+
+def fatal_error(message)
+  $stderr.print "whiz.rb: #{$verb} fatal error: #{message}\n"
+  exit(-1)
+end
 
 def deg_to_rad(x)
   return 0.0174532925199433*x
@@ -97,26 +128,34 @@ cartesian.each { |p|
 # filtering to get rid of artifacts of bad digital elevation model, which have a big effect
 # on calculations of gain
 
-osc_h = 500 # typical wavelength, in meters, of bogus oscillations
 hv2 = []
 hv.each { |a|
   h,v = a
 
-  #h0 = a[0]
-  #hv.each { |b|
-  #  h,dh,dv,dd = b
-  #  if Math::abs(h-h0<osc_h/2.0) then end
-  #}
+  v_av = 0
+  n_av = 0
+  hv.each { |b|
+    hh,vv = b
+    # if hh<100.0 then print "-------> #{hh}, #{(hh-h).abs}\n" end # qwe
+    if (hh-h).abs<osc_h/2.0 then
+      # print " yes\n"
+      v_av = v_av+vv
+      n_av = n_av+1
+    end
+  }
+  if n_av<1 then fatal_error("n_av<1?? at h,v=#{h},#{v}") end
+  v = v_av/n_av
 
   hv2.push([h,v])
 }
 hv = hv2
 
-# integrate...
+# integrate to find total gain, calories burned
 h = 0 # total horizontal distance
 v = 0 # total vertical distance (=0 at end of a loop)
 d = 0 # total distance along the slope
 gain = 0 # total gain
+c = 0 # cost in joules
 first = true
 old_h = 0
 old_v = 0
@@ -128,12 +167,17 @@ hv.each { |a|
     dd = Math::sqrt(dh*dh+dv*dv)
     d = d+dd
     if dv>0 then gain=gain+dv end
+    i=0
+    if dh>0 then i=dv/dh end
+    c = c+dd*$body_mass*minetti(i)
+         # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
     csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]}\n"
   end
   old_h = h
   old_v = v
   first = false
 }
+
 
 
 if $metric then
@@ -148,9 +192,11 @@ else
   d = (d/1000.0)*0.621371
   gain = gain*3.28084
 end
+kcals = c*0.000239006
 print "horizontal distance = #{"%6.2f" % [h]} #{h_unit}\n"
 print "slope distance = #{"%6.2f" % [d]} #{h_unit}\n"
 print "gain = #{"%5.0f" % [gain]} #{v_unit}\n"
+print "cost = #{"%5.0f" % [kcals]} kcals\n"
 
 File.open('kcals.csv','w') { |f| 
   f.print csv
