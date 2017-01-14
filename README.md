@@ -26,8 +26,11 @@ See the file sample_prefs for a sample preferences file.
 Parameters are:
 
   metric -- 0 for US units, 1 for metric
+
   running -- 0 for walking, 1 for running
+
   weight -- body mass in kg
+
   filtering -- see below
 
 Filtering is a parameter with units of meters that defaults to 500, meant to get rid of bogus
@@ -45,4 +48,5 @@ They got their data from elite mountain runners (all male) running on a treadmil
 The outputs seem low compared to other estimates I've seen. This may be because these
 elite athletes were very efficient, were not carrying packs or wearing heavy boots, and
 were running on a nice uniform treadmill. I find the data most useful if I want to compare
-one run to another.
+one run to another, e.g., if I want to know how a mountain run with lots of elevation gain
+compares with a flat run at a longer distance.
