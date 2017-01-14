@@ -167,7 +167,7 @@ hv.each { |a|
   n_av = 0
   hv.each { |b|
     hh,vv = b
-    if (hh-h).abs<$osc_h/2.0 then
+    if (hh-h).abs<($osc_h+0.01)/2.0 then
       # print " yes\n"
       v_av = v_av+vv
       n_av = n_av+1
