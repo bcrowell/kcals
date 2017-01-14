@@ -1,7 +1,7 @@
 kcals
 =====
 
-This is software that tries to estimate your energy expenditure from
+This is Unix command line software that tries to estimate your energy expenditure from
 running or walking. 
 
 Many applications, such as mapmyrun, output GPS tracks in KML format but set all the altitude data to
