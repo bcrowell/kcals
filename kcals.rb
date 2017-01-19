@@ -15,6 +15,12 @@ def warning(message)
   $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
 end
 
+def shell_out(c)
+  ok = system(c)
+  return true if ok
+  fatal_error("error on shell command #{c}, #{$?}")
+end
+
 $metric = false
 $running = true # set to false for walking
 $body_mass = 66 # in kg, =145 lb
@@ -22,7 +28,8 @@ $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height da
             # calculated gain is very sensitive to this
             # putting in this value, which I estimated by eye from a graph, seems to reproduce
             # mapmyrun's figure for total gain
-$format = 'kml' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
+$format = 'text' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
+$dem = false # attempt to download DEM if absent from input?; this doesn't work
 
 $warned_big_delta = false
 
@@ -35,6 +42,7 @@ def handle_param(s,where)
     if par=='weight' then recognized=true; $body_mass=value.to_f end
     if par=='filtering' then recognized=true; $osc_h=value.to_f end
     if par=='format' then recognized=true; $format=value end
+    if par=='dem' then recognized=true; $dem=(value.to_i==1) end
     if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
   else
     fatal_error("illegal syntax#{where}:\n#{s}")
@@ -165,7 +173,77 @@ path.each { |p|
   if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
   if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
 }
+lon_lo = 999.9
+lon_hi = -999.9
+lat_lo = 999.9
+lat_hi = -999.9
+alt_lo = 10000.0
+alt_hi = -10000.0
+path.each { |p|
+  lat,lon,alt = p
+  lon_lo=lon if lon < lon_lo
+  lon_hi=lon if lon > lon_hi
+  lat_lo=lat if lat < lat_lo
+  lat_hi=lat if lat > lat_hi
+  alt_lo=alt if alt < alt_lo
+  alt_hi=alt if alt > alt_hi
+}
 
+no_alt = alt_lo==0.0 && alt_hi==0.0
+if no_alt then
+  warning("The input file does not appear to contain any elevation data.")
+end
+if no_alt && $dem then
+  # I couldn't get this to work, basically because neither imagemagick nor gimp seems to support 16-bit files.
+  # eio clip -o rome.tif --bounds 12.35 41.8 12.65 42
+  temp_tif = 'temp.tif'
+  temp_pgm = 'temp.pgm'
+  box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
+  $stderr.print "Attempting to download DEM data, lat-lon box=#{box}.\n"
+  shell_out("eio clip -o #{temp_tif} --bounds #{box}") # box is sanitized, because all input have been through .to_f
+  shell_out("convert #{temp_tif} -depth 16 -compress none #{temp_pgm}")
+  head1 = ''
+  head2 = ''
+  head3 = ''
+  z_data = nil
+  File.open(temp_pgm,'r') { |f|
+    head1 = f.readline
+    head2 = f.readline
+    head3 = f.readline
+    w,h = 0,0
+    if head2=~/(\d+)\s+(\d+)/ then
+      w,h = $1.to_i,$2.to_i
+    else
+      fatal_error("error reading header line 2 from file #{temp_pgm}")
+    end
+    $stderr.print "w,h=#{w},#{h}\n"
+    z_data = Array.new(h) { |i| Array.new(w) { |j| 0 }} # z_data[y][x], y going from top to bottom
+    ix = 0
+    iy = 0
+    while(line = f.gets) != nil
+      line.split(/\s+/).each { |z|
+        next unless z=~/[0-9]/
+        z = z.to_i
+        lsb = z % 256
+        msb = z / 256
+        zz = lsb*256+msb # byte swap
+        $stderr.print "ix=#{ix} iy=#{iy} z=#{z} lsb=#{lsb} msb=#{msb} zz=#{zz}\n" if lsb!=msb
+        z_data[iy][ix] = zz
+        ix = ix+1
+        if ix>=w then ix=0; iy=iy+1 end
+      }
+    end
+  }
+  # overwrite the pgm with byte-swapped data so I can inspect it for debugging purposes
+  File.open(temp_pgm,'w') { |f|
+    f.print head1
+    f.print head2
+    f.print head3
+    z_data.each { |row|
+      row.each { |z| f.print "#{z}\n"}
+    }
+  }
+end
 
 csv = ''
 path_csv = ''

@@ -7,13 +7,13 @@ running or walking.
 Many applications, such as mapmyrun, output GPS tracks in KML format but set all the altitude data to
 zero. To get around this, run the KML file through the filter at
 http://www.gpsvisualizer.com/elevation . Under "output," select
-"plain text," and use the option format=text.
+"plain text," which is the default format that the software expects.
 
 usage:
 
-   kcals.rb <route.kml ... read parameters from preferences file
+   kcals.rb <route.txt ... read parameters from preferences file
 
-   kcals.rb filtering=600 weight=58 <route.kml ... override parameters from command line
+   kcals.rb format=kml filtering=600 weight=58 <route.kml ... override parameters from command line
 
 The input formats that are supported are KML and the text format
 written by gpsvisualizer.com.  Writes total stats to stdout. Also
