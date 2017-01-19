@@ -7,8 +7,12 @@
 command_line_parameters=ARGV
 
 def fatal_error(message)
-  $stderr.print "whiz.rb: #{$verb} fatal error: #{message}\n"
+  $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
   exit(-1)
+end
+
+def warning(message)
+  $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
 end
 
 $metric = false
@@ -18,6 +22,9 @@ $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height da
             # calculated gain is very sensitive to this
             # putting in this value, which I estimated by eye from a graph, seems to reproduce
             # mapmyrun's figure for total gain
+$format = 'kml' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
+
+$warned_big_delta = false
 
 def handle_param(s,where)
   if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
@@ -27,6 +34,7 @@ def handle_param(s,where)
     if par=='running' then recognized=true; $running=(value.to_i==1) end
     if par=='weight' then recognized=true; $body_mass=value.to_f end
     if par=='filtering' then recognized=true; $osc_h=value.to_f end
+    if par=='format' then recognized=true; $format=value end
     if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
   else
     fatal_error("illegal syntax#{where}:\n#{s}")
@@ -43,12 +51,12 @@ begin
     }
   }
 rescue
-  print "Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.\n"
+  warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
 end
 # then override at command line:
 command_line_parameters.each { |p| handle_param(p,'') }
 
-print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m\n"
+print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
 
 # For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
 
@@ -56,9 +64,16 @@ def minetti(i)
   if $running then return minetti_cr(i) else return minetti_cw(i) end
 end
 
+def in_minetti_range(i)
+  return -0.5 if i<-0.5
+  return 0.5 if i>0.5
+  return i
+end
+
 def minetti_cr(i)
   # i = gradient
   # cr = cost of running, in J/kg.m
+  i = in_minetti_range(i)
   return 155.4*i**5-30.4*i**4-43.3*i**3+46.3*i**2+19.5*i+3.6
   # note that the 3.6 is different from their best value of 3.4 on the flats, i.e., the polynomial isn't a perfect fit
 end
@@ -66,6 +81,7 @@ end
 def minetti_cw(i)
   # i = gradient
   # cr = cost of walking, in J/kg.m
+  i = in_minetti_range(i)
   return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
 end
 
@@ -104,29 +120,72 @@ def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   return [r,xx,y,zz]
 end
 
-cartesian = [] # array of [r,x,y,z]
+path = []
+format_recognized = false
 
+if $format=='kml' then
+  format_recognized = true
+  kml = $stdin.gets(nil) # slurp all of stdin until end of file
+  # xml; relevant part looks like this:
+  #    <coordinates>
+  #     -117.96391,33.88906,0 -117.96531,33.88905,0 
+  #    </coordinates>
+  # Bug: the following doesn't really parse xml correctly, may not work for xml output that doesn't look like I expect.
+  # Should probably look for coords inside <Folder id="Tracks">, but instead just look for one that seems long enough,
+  # since the coords I don't want are single points
+  kml.gsub!(/\n/,' ') # smash everything to one line
+  coords_text = ''
+  if kml=~/<coordinates>([^<]{100,})<\/coordinates>/ then # at least 100 characters for the actual path
+    coords_text = $1
+    coords_text.split(/\s+/).each { |point|
+      if point=~/(.*),(.*),(.*)/ then
+        path.push([$2.to_f,$1.to_f,$3.to_f])
+      end
+    }
+  else
+    fatal_error("no <coordinates>...</coordinates> element found in input KML file")
+  end
+end
+
+if $format=='text' then
+  format_recognized = true
+  $stdin.each_line { |line|
+    if line=~/\AT\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/ then
+      lat,lon,alt = $1.to_f,$2.to_f,$3.to_f # in degrees, degrees, meters
+      path.push([lat,lon,alt])
+    end
+  }
+end
+
+if !format_recognized then fatal_error("unrecognized format: #{$format}") end
+
+path.each { |p|
+  lat,lon,alt = p
+  if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
+  if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
+  if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
+}
+
+
+csv = ''
+path_csv = ''
+
+cartesian = [] # array of [r,x,y,z]
 first = true
 lat0 = 0
 lon0 = 0
-$stdin.each_line { |line|
-  if line=~/\AT\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/ then
-    lat,lon,alt = $1.to_f,$2.to_f,$3.to_f # in degrees, degrees, meters
-    if first then lat0=lat; lon0=lon end # for convenience of visualization and interp, subtract this off of all lons
-    #print "#{lat},#{lon},#{alt}\n"
-    # r,x,y,z = spherical_to_cartesian(lat,lon,alt)
-    # print "#{x},#{y},#{z}\n"
-    cartesian.push(spherical_to_cartesian(lat,lon,alt,lat0,lon0))
-    first=false
-  end
+path.each { |p|
+  lat,lon,alt = p # in degrees, degrees, meters
+  if first then lat0=lat; lon0=lon end # for convenience of visualization and interp, subtract this off of all lons
+  cart = spherical_to_cartesian(lat,lon,alt,lat0,lon0)
+  path_csv = path_csv + "#{lat},#{lon},#{alt},#{cart[0]},#{cart[1]},#{cart[2]}\n"
+  cartesian.push(cart)
+  first=false
 }
-
 n = cartesian.length
 
 #print "points read = #{n}\n"
 if n==0 then $stderr.print "error, no points read successfully from input\n"; exit(-1) end
-
-csv = ''
 
 # definitions of variables:
 #   h,v,d are cumulative horiz, vert, and slope distance
@@ -149,6 +208,12 @@ cartesian.each { |p|
     dh = Math::sqrt(dl2-dv*dv) # horizontal distance
     h = h+dh
     v = v+dv
+  end
+  if i>0 && dh>10000.0 then
+    if !$warned_big_delta then
+      warning("Two successive points are more than 10 km apart horizontally: dx=#{dx}, dy=#{dy}, dx=#{dz}.")
+      $warned_big_delta = true
+    end
   end
   hv.push([h,v]) # in first iteration, is [0,0]
   # if i<10 then print "#{"%9.2f" % [h]},#{"%9.2f" % [v]}\n" end
@@ -230,4 +295,7 @@ print "cost = #{"%5.0f" % [kcals]} kcals\n"
 
 File.open('kcals.csv','w') { |f| 
   f.print csv
+}
+File.open('path.csv','w') { |f| 
+  f.print path_csv
 }
