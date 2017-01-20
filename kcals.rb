@@ -9,21 +9,6 @@ require 'json'
 
 command_line_parameters=ARGV
 
-def fatal_error(message)
-  $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
-  exit(-1)
-end
-
-def warning(message)
-  $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
-end
-
-def shell_out(c)
-  ok = system(c)
-  return true if ok
-  fatal_error("error on shell command #{c}, #{$?}")
-end
-
 $metric = false
 $running = true # set to false for walking
 $body_mass = 66 # in kg, =145 lb
@@ -34,9 +19,34 @@ $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height da
 $format = 'kml' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
 $dem = false # attempt to download DEM if absent from input?
 $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
-               # warnings are shown at level 1 and above
                # at level 3, when we shell out, stderr and stdout get displayed
                # level 0 means just output some json for use by a script
+
+$warnings = []
+
+def fatal_error(message)
+  if $verbosity>=1 then
+    $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
+  else
+    print JSON.generate({'error'=>message})+"\n"
+  end
+  exit(-1)
+end
+
+def warning(message)
+  if $verbosity>=1 then
+    $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
+  else
+    $warnings.push(message)
+  end
+end
+
+def shell_out(c)
+  ok = system(c)
+  return true if ok
+  fatal_error("error on shell command #{c}, #{$?}")
+end
+
 
 $warned_big_delta = false
 
@@ -182,6 +192,7 @@ if $format=='kml' then
   # Bug: the following doesn't really parse xml correctly, may not work for xml output that doesn't look like I expect.
   # Should probably look for coords inside <Folder id="Tracks">, but instead just look for one that seems long enough,
   # since the coords I don't want are single points
+  if kml.nil? then fatal_error("empty input file") end
   kml.gsub!(/\n/,' ') # smash everything to one line
   coords_text = ''
   if kml=~/<coordinates>([^<]{100,})<\/coordinates>/ then # at least 100 characters for the actual path
@@ -434,7 +445,9 @@ else
   print JSON.generate({'horiz'=>("%.2f" % [h]),'horiz_unit'=>h_unit,
                  'slope_distance'=>("%.2f" % [d]),
                  'gain'=>("%.0f" % [gain]),'vert_unit'=>v_unit,
-                 'cost'=>("%.0f" % [kcals])})+"\n"
+                 'cost'=>("%.0f" % [kcals]),
+                 'warnings'=>$warnings
+           })+"\n"
 end
 
 File.open('profile.csv','w') { |f| 
