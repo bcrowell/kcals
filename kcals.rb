@@ -361,7 +361,7 @@ if !$cgi then
 end
 
 #print "points read = #{n}\n"
-if n==0 then $stderr.print "error, no points read successfully from input; usually this means you specified the wrong format\n"; exit(-1) end
+if n==0 then fatal_error("error, no points read successfully from input; usually this means you specified the wrong format") end
 
 # definitions of variables:
 #   h,v,d are cumulative horiz, vert, and slope distance

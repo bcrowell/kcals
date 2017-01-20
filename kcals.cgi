@@ -113,10 +113,11 @@ if cgi.has_key?('weight') then $weight=cgi['weight'].to_f end
 infile = Tempfile.new('kcals')
 begin
   print "<h1>Kcals</h1>\n"
-  #print "<p>#{Dir.pwd}</p>\n"
   infile << cgi_file.read # copy CGI upload data into temp file, which we will then read back
-  #print `cat #{infile.path}`
-  json = `CGI=1 ./kcals.rb verbosity=0 dem=1 metric=#{$metric} running=#{$running} format=#{$format} weight=#{$weight} <#{infile.path}` # verbosity=0 makes it output json data
+  infile.close
+  c = "CGI=1 ./kcals.rb verbosity=0 dem=1 metric=#{$metric} running=#{$running} format=#{$format} weight=#{$weight} <#{infile.path}"
+  print "<!-- #{c} -->\n" # for debugging purposes
+  json = `#{c}`
   print "<!-- #{json} -->\n" # for debugging purposes
   results = JSON.parse(json)
   print format_output(results)
