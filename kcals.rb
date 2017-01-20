@@ -31,8 +31,8 @@ $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height da
             # calculated gain is very sensitive to this
             # putting in this value, which I estimated by eye from a graph, seems to reproduce
             # mapmyrun's figure for total gain
-$format = 'text' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
-$dem = true # attempt to download DEM if absent from input?
+$format = 'kml' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
+$dem = false # attempt to download DEM if absent from input?
 $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
                # warnings are shown at level 1 and above
                # at level 3, when we shell out, stderr and stdout get displayed
