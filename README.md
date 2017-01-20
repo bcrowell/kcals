@@ -58,7 +58,7 @@ zero. To get around this, there are two options:
 
 (1) Run the KML file through the filter at
 http://www.gpsvisualizer.com/elevation . Under "output," select
-"plain text," which is the default format that the software expects.
+"plain text." Run this software with format=text.
 
 (2) Set dem=1, and if the software detects that elevation information is missing from the input
 file, it will download it.
