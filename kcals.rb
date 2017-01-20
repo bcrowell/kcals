@@ -9,6 +9,8 @@ require 'json'
 
 command_line_parameters=ARGV
 
+$cgi = ENV.has_key?("CGI")
+
 $metric = false
 $running = true # set to false for walking
 $body_mass = 66 # in kg, =145 lb
@@ -25,7 +27,7 @@ $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a sc
 $warnings = []
 
 def fatal_error(message)
-  if $verbosity>=1 then
+  if $verbosity>=1 && !$cgi then
     $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
   else
     print JSON.generate({'error'=>message})+"\n"
@@ -34,7 +36,7 @@ def fatal_error(message)
 end
 
 def warning(message)
-  if $verbosity>=1 then
+  if $verbosity>=1 && !$cgi then
     $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
   else
     $warnings.push(message)
@@ -46,7 +48,6 @@ def shell_out(c)
   return true if ok
   fatal_error("error on shell command #{c}, #{$?}")
 end
-
 
 $warned_big_delta = false
 
@@ -70,16 +71,18 @@ def handle_param(s,where)
 end
 
 # first read from prefs file:
-prefs = "#{Dir.home}/.kcals"
-begin
-  open(prefs,'r') { |f|
-    f.each_line {|line|
-      next if line=~/\A\s*\Z/
-      handle_param(line," in #{prefs}")
+if !$cgi then
+  prefs = "#{Dir.home}/.kcals"
+  begin
+    open(prefs,'r') { |f|
+      f.each_line {|line|
+        next if line=~/\A\s*\Z/
+        handle_param(line," in #{prefs}")
+      }
     }
-  }
-rescue
-  warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
+  rescue
+    warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
+  end
 end
 # then override at command line:
 command_line_parameters.each { |p| handle_param(p,'') }
@@ -328,9 +331,12 @@ path.each { |p|
   first=false
 }
 n = cartesian.length
-File.open('path.csv','w') { |f| 
-  f.print path_csv
-}
+
+if !$cgi then
+  File.open('path.csv','w') { |f| 
+    f.print path_csv
+  }
+end
 
 #print "points read = #{n}\n"
 if n==0 then $stderr.print "error, no points read successfully from input; usually this means you specified the wrong format\n"; exit(-1) end
@@ -450,8 +456,10 @@ else
            })+"\n"
 end
 
-File.open('profile.csv','w') { |f| 
-  f.print csv
-}
+if !$cgi then
+  File.open('profile.csv','w') { |f| 
+    f.print csv
+  }
+end
 
 shell_out("rm -f #{$temp_files.join(' ')}")

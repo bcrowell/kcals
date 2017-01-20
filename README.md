@@ -72,3 +72,10 @@ To allow downloading of elevation data:
 apt-get install libgdal-dev gdal-bin python-gdal
 
 pip install elevation
+
+CGI:
+
+rintintin kcals # cp kcals.rb /usr/lib/cgi-bin
+rintintin kcals # cp kcals.cgi /usr/lib/cgi-bin
+rintintin kcals # chmod +x /usr/lib/cgi-bin/kcals.rb /usr/lib/cgi-bin/kcals.cgi
+rintintin kcals # cp kcals.html /var/www/html
