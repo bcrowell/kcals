@@ -75,7 +75,16 @@ pip install elevation
 
 CGI:
 
-rintintin kcals # cp kcals.rb /usr/lib/cgi-bin
-rintintin kcals # cp kcals.cgi /usr/lib/cgi-bin
-rintintin kcals # chmod +x /usr/lib/cgi-bin/kcals.rb /usr/lib/cgi-bin/kcals.cgi
-rintintin kcals # cp kcals.html /var/www/html
+cp kcals.rb /usr/lib/cgi-bin
+
+cp kcals.cgi /usr/lib/cgi-bin
+
+chmod +x /usr/lib/cgi-bin/kcals.rb /usr/lib/cgi-bin/kcals.cgi
+
+cp kcals.html /var/www/html
+
+mkdir /usr/lib/cgi-bin/kcals_scratch
+
+chgrp www-data /usr/lib/cgi-bin/kcals_scratch
+
+chmod g+w /usr/lib/cgi-bin/kcals_scratch

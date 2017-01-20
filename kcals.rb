@@ -26,6 +26,10 @@ $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a sc
 
 $warnings = []
 
+def clean_up_temp_files
+  shell_out("rm -f #{$temp_files.join(' ')}")
+end
+
 def fatal_error(message)
   if $verbosity>=1 && !$cgi then
     $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
@@ -43,10 +47,10 @@ def warning(message)
   end
 end
 
-def shell_out(c)
+def shell_out(c,additional_error_info='')
   ok = system(c)
   return true if ok
-  fatal_error("error on shell command #{c}, #{$?}")
+  fatal_error("error on shell command #{c}, #{$?}\n#{additional_error_info}")
 end
 
 $warned_big_delta = false
@@ -249,18 +253,35 @@ if no_alt && !$dem then
   warning("The input file does not appear to contain any elevation data. Turn on the option 'dem' to try to download this.")
 end
 if no_alt && $dem then
-  temp_tif = 'temp.tif'
-  temp_aig = 'temp.aig'
+  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
+  temp_tif = "#{temp}.tif"
+  temp_aig = "#{temp}.aig"
+  temp_stderr = "#{temp}.stderr"
+  temp_stdout = "#{temp}.stdout"
   $temp_files.push(temp_tif)
   $temp_files.push(temp_aig)
-  $temp_files.push("temp.prj")
-  $temp_files.push("temp.aig.aux.xml")
+  $temp_files.push("#{temp}.prj")
+  $temp_files.push("#{temp}.aig.aux.xml")
   box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
   if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
-  redir = "1>/dev/null 2>/dev/null";
+  redir = "1>#{temp_stdout} 2>#{temp_stderr}";
   if $verbosity>=3 then redir='' end
-  shell_out("eio clip -o #{temp_tif} --bounds #{box} #{redir}") # box is sanitized, because all input have been through .to_f
+  save_dir = Dir.pwd
+  if $cgi then Dir.chdir("kcals_scratch") end
+  shell_out('echo "foo" >a.a') # qwe
+  if $cgi then # in command-line use, these get marked for deletion below, only after running the commands, so possible
+               # error information is preserved
+    $temp_files.push(temp_stderr)
+    $temp_files.push(temp_stdout)
+  end
+  shell_out("eio --cache_dir #{Dir.pwd} clip -o #{temp_tif} --bounds #{box} #{redir}",
+            "Information about the errors may be in the files temp*.stdout and temp*.stderr.") 
+          # box is sanitized, because all input have been through .to_f
   shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig} #{redir}")
+  if !$cgi then
+    $temp_files.push(temp_stderr) # mark them for deletion now, since no interesting error messages in them
+    $temp_files.push(temp_stdout)
+  end
   # read headers first
   aig_headers = Hash.new
   File.open(temp_aig,'r') { |f|
@@ -297,6 +318,7 @@ if no_alt && $dem then
       }
     end
   }
+  if $cgi then Dir.chdir(save_dir) end
   last_ix = 0
   last_iy = 0
   i=0
@@ -462,4 +484,4 @@ if !$cgi then
   }
 end
 
-shell_out("rm -f #{$temp_files.join(' ')}")
+clean_up_temp_files
