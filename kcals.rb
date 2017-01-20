@@ -4,8 +4,6 @@ require 'json'
 
 # See README.md for documentation.
 
-# to do:
-#   delete temp files
 # wish list:
 #   out and back option/detection
 
@@ -41,6 +39,8 @@ $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a sc
                # level 0 means just output some json for use by a script
 
 $warned_big_delta = false
+
+$temp_files = []
 
 def handle_param(s,where)
   if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
@@ -237,6 +237,10 @@ end
 if no_alt && $dem then
   temp_tif = 'temp.tif'
   temp_aig = 'temp.aig'
+  $temp_files.push(temp_tif)
+  $temp_files.push(temp_aig)
+  $temp_files.push("temp.prj")
+  $temp_files.push("temp.aig.aux.xml")
   box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
   if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
   redir = "1>/dev/null 2>/dev/null";
@@ -436,3 +440,5 @@ end
 File.open('profile.csv','w') { |f| 
   f.print csv
 }
+
+shell_out("rm -f #{$temp_files.join(' ')}")
