@@ -17,7 +17,7 @@ usage:
 
 The input formats that are supported are KML and the text format
 written by gpsvisualizer.com.  Writes total stats to stdout. Also
-writes some spreadsheet data to kcals.csv, which can be used to graph
+writes some spreadsheet data to profile.csv, which can be used to graph
 the elevation profile. 
 
 Preferences are read from the file ~/.kcals, but can be overridden from the command line
@@ -34,6 +34,10 @@ Parameters are:
   filtering -- see below
 
   format -- text or kml
+
+  verbosity -- a level from 0 to 3
+
+  dem -- 1 means try to download elevation data if it's not included in the input, 0 means don't
 
 Filtering is a parameter with units of meters that defaults to 500, meant to get rid of bogus
 oscillations in the height data, which seem to be present in the databases used by
@@ -52,3 +56,5 @@ elite athletes were very efficient, were not carrying packs or wearing heavy boo
 were running on a nice uniform treadmill. I find the data most useful if I want to compare
 one run to another, e.g., if I want to know how a mountain run with lots of elevation gain
 compares with a flat run at a longer distance.
+
+Dependencies: ubuntu package libjson-ruby

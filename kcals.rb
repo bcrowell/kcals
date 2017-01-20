@@ -1,5 +1,7 @@
 #!/usr/bin/ruby
 
+require 'json'
+
 # See README.md for documentation.
 
 # to do:
@@ -32,7 +34,11 @@ $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height da
             # putting in this value, which I estimated by eye from a graph, seems to reproduce
             # mapmyrun's figure for total gain
 $format = 'text' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
-$dem = false # attempt to download DEM if absent from input?; this doesn't work
+$dem = true # attempt to download DEM if absent from input?
+$verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
+               # warnings are shown at level 1 and above
+               # at level 3, when we shell out, stderr and stdout get displayed
+               # level 0 means just output some json for use by a script
 
 $warned_big_delta = false
 
@@ -46,6 +52,7 @@ def handle_param(s,where)
     if par=='filtering' then recognized=true; $osc_h=value.to_f end
     if par=='format' then recognized=true; $format=value end
     if par=='dem' then recognized=true; $dem=(value.to_i==1) end
+    if par=='verbosity' then recognized=true; $verbosity=value.to_i end
     if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
   else
     fatal_error("illegal syntax#{where}:\n#{s}")
@@ -67,7 +74,9 @@ end
 # then override at command line:
 command_line_parameters.each { |p| handle_param(p,'') }
 
-print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+if $verbosity>=2 then
+  print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+end
 
 # For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
 
@@ -107,7 +116,10 @@ def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   a = 6378137.0 # earth's equatorial radius, in meters
   b = 6356752.3 # polar radius
   lat_rad = deg_to_rad(lat)
-  lon_rad = deg_to_rad(lon-lon0)
+  rotate = true # rotate to tangent coordinates?
+  lonx = lon
+  if rotate then lonx=lon-lon0 end
+  lon_rad = deg_to_rad(lonx)
   slat = Math::sin(lat_rad)
   slon = Math::sin(lon_rad)
   clat = Math::cos(lat_rad)
@@ -124,11 +136,37 @@ def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   z = r*slat
   xx = x
   zz = z
-  if true then
+  if rotate then
     xx =  clat0*x+slat0*z
     zz = -slat0*x+clat0*z
   end
   return [r,xx,y,zz]
+end
+
+def pythag(x,y)
+  return Math::sqrt(x*x+y*y)
+end
+
+def interpolate_square(x,y,z00,z10,z01,z11)
+  root2 = Math::sqrt(2.0)
+  w00 = (root2-pythag(x,y)).abs
+  w10 = (root2-pythag(x-1.0,y)).abs
+  w01 = (root2-pythag(x,y-1.0)).abs
+  w11 = (root2-pythag(x-1.0,y-1.0)).abs
+  norm = w00+w10+w01+w11
+  z = (z00*w00+z10*w10+z01*w01+z11*w11)/norm
+  return z
+end
+
+def interpolate_raster(z,x,y)
+  # z = array[iy][ix]
+  # x,y = floating point, in array-index units
+  ix = x.to_i
+  iy = y.to_i
+  fx = x-ix # fractional part
+  fy = y-iy
+  z = interpolate_square(fx,fy,z[iy][ix],z[iy][ix+1],z[iy+1][ix],z[iy+1][ix+1])  
+  return z
 end
 
 path = []
@@ -193,18 +231,18 @@ path.each { |p|
 }
 
 no_alt = alt_lo==0.0 && alt_hi==0.0
-if no_alt then
-  warning("The input file does not appear to contain any elevation data.")
+if no_alt && !$dem then
+  warning("The input file does not appear to contain any elevation data. Turn on the option 'dem' to try to download this.")
 end
 if no_alt && $dem then
-  # I couldn't get this to work, basically because neither imagemagick nor gimp seems to support 16-bit files.
-  # eio clip -o rome.tif --bounds 12.35 41.8 12.65 42
   temp_tif = 'temp.tif'
   temp_aig = 'temp.aig'
   box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
-  $stderr.print "Attempting to download DEM data, lat-lon box=#{box}.\n"
-  shell_out("eio clip -o #{temp_tif} --bounds #{box}") # box is sanitized, because all input have been through .to_f
-  shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig}")
+  if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
+  redir = "1>/dev/null 2>/dev/null";
+  if $verbosity>=3 then redir='' end
+  shell_out("eio clip -o #{temp_tif} --bounds #{box} #{redir}") # box is sanitized, because all input have been through .to_f
+  shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig} #{redir}")
   # read headers first
   aig_headers = Hash.new
   File.open(temp_aig,'r') { |f|
@@ -226,7 +264,6 @@ if no_alt && $dem then
   if w.nil? or h.nil? or xllcorner.nil? or yllcorner.nil? or cellsize.nil? then
     fatal_error("error reading header lines from file #{temp_aig}, headers=#{aig_headers}")
   end
-  $stderr.print "w,h=#{w},#{h}\n"
   z_data = nil
   File.open(temp_aig,'r') { |f|
     z_data = Array.new(h) { |i| Array.new(w) { |j| 0 }} # z_data[y][x], y going from top to bottom
@@ -247,26 +284,20 @@ if no_alt && $dem then
   i=0
   path.each { |p|
     lat,lon,alt = p
-    ix = ((lon-xllcorner)/cellsize).to_i
-    iy = ((lat-yllcorner)/cellsize).to_i
-    if ix<0 or ix>w-1then 
-      warning("ix=#{ix} out of range, set to #{last_ix}")
-      ix = last_ix
-    end
-    if iy<0 or iy>h-1 then 
-      warning("iy=#{iy} out of range, set to #{last_iy}")
-      iy = last_iy
-    end
-    last_ix = ix
-    last_iy = iy
-    z = z_data[iy][ix]
+    x = (lon-xllcorner)/cellsize # in array-index units, but floating point
+    y = h-(lat-yllcorner)/cellsize
+    if x<0.0 then x=0.0 end
+    if x>w-1 then x=(w-1.0001).to_f end
+    if y<0.0 then y=0.0 end
+    if y>h-1 then y=(h-1.0001).to_f end
+    z = interpolate_raster(z_data,x,y)
     path[i] = [lat,lon,z]
     i=i+1
   }
 end
 
-csv = ''
-path_csv = ''
+csv = "horizontal,vertical,dh,dv\n"
+path_csv = "lat,lon,alt,x,y,z\n"
 
 cartesian = [] # array of [r,x,y,z]
 first = true
@@ -274,7 +305,8 @@ lat0 = 0
 lon0 = 0
 path.each { |p|
   lat,lon,alt = p # in degrees, degrees, meters
-  if first then lat0=lat; lon0=lon end # for convenience of visualization and interp, subtract this off of all lons
+  if first then lat0=lat; lon0=lon end
+        # ... for convenience of visualization and interp, and also to fix radius of earth at initial value
   cart = spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   path_csv = path_csv + "#{lat},#{lon},#{alt},#{cart[0]},#{cart[1]},#{cart[2]}\n"
   cartesian.push(cart)
@@ -389,11 +421,18 @@ else
   gain = gain*3.28084
 end
 kcals = c*0.000239006
-print "horizontal distance = #{"%6.2f" % [h]} #{h_unit}\n"
-print "slope distance = #{"%6.2f" % [d]} #{h_unit}\n"
-print "gain = #{"%5.0f" % [gain]} #{v_unit}\n"
-print "cost = #{"%5.0f" % [kcals]} kcals\n"
+if $verbosity>0 then
+  print "horizontal distance = #{"%.2f" % [h]} #{h_unit}\n"
+  print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
+  print "gain = #{"%.0f" % [gain]} #{v_unit}\n"
+  print "cost = #{"%.0f" % [kcals]} kcals\n"
+else
+  print JSON.generate({'horiz'=>("%.2f" % [h]),'horiz_unit'=>h_unit,
+                 'slope_distance'=>("%.2f" % [d]),
+                 'gain'=>("%.0f" % [gain]),'vert_unit'=>v_unit,
+                 'cost'=>("%.0f" % [kcals])})+"\n"
+end
 
-File.open('kcals.csv','w') { |f| 
+File.open('profile.csv','w') { |f| 
   f.print csv
 }
