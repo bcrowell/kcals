@@ -4,6 +4,8 @@ require 'cgi'
 require 'tempfile'
 require 'json'
 
+$home_url = "http://lightandmatter.com/kcals"
+
 cgi = CGI.new # https://ruby-doc.org/stdlib-1.9.3/libdoc/cgi/rdoc/CGI.html
 
 def html_top
@@ -26,7 +28,7 @@ HTML
 end
 
 def about_method
-  return <<'HTML'
+  return <<"HTML"
     <p>
       The method used to calculate the energy expenditure is from
       <a href="http://jap.physiology.org/content/93/3/1039.full">Minetti et al.
@@ -37,6 +39,14 @@ def about_method
       I find the data most useful if I want to compare
       one run to another, e.g., if I want to know how a mountain run with lots of elevation gain
       compares with a flat run at a longer distance.
+    </p>
+    <p>
+      This software is <a href="https://github.com/bcrowell/kcals">open source</a>, and if you prefer
+      to run it on your machine rather than through a web interface, you can do that from the unix
+      command line.
+    </p>
+    <p>
+      <a href="#{$home_url}">Do another calculation.</a>
     </p>
 HTML
 end
@@ -83,13 +93,21 @@ if !(cgi.has_key?('file')) then exit(-1) end
 
 cgi_file = cgi['file'] # cgi_file is a StringIO object, which is a string that you can use file methods on
 
+# The following are all based on user input, so we make sure they stay sanitized:
+$metric = 1
+$running = 1
+$format = 'kml'
+if cgi.has_key?('metric') && cgi['metric']=='0' then $metric=0 end
+if cgi.has_key?('running') && cgi['running']=='0' then $running=0 end
+if cgi.has_key?('format') && cgi['format']=='text' then $format='text' end
+
 infile = Tempfile.new('kcals')
 begin
   print "<h1>Kcals</h1>\n"
   #print "<p>#{Dir.pwd}</p>\n"
   infile << cgi_file.read # copy CGI upload data into temp file, which we will then read back
   #print `cat #{infile.path}`
-  json = `CGI=1 ./kcals.rb verbosity=0 dem=1 <#{infile.path}` # verbosity=0 makes it output json data
+  json = `CGI=1 ./kcals.rb verbosity=0 dem=1 metric=#{$metric} running=#{$running} format=#{$format} <#{infile.path}` # verbosity=0 makes it output json data
   print "<!-- #{json} -->\n" # for debugging purposes
   results = JSON.parse(json)
   print format_output(results)
