@@ -65,6 +65,13 @@ def format_output(r)
   print <<"TABLE"
     <table>
       <tr>
+        <td>#{$running==1 ? 'running' : 'walking'}</td>
+      </tr>
+      <tr>
+        <td>weight</td>
+        <td>#{$weight} kg</td>
+      </tr>
+      <tr>
         <td>horizontal distance</td>
         <td>#{r['horiz']} #{r['horiz_unit']}</td>
       </tr>
@@ -94,12 +101,14 @@ if !(cgi.has_key?('file')) then exit(-1) end
 cgi_file = cgi['file'] # cgi_file is a StringIO object, which is a string that you can use file methods on
 
 # The following are all based on user input, so we make sure they stay sanitized:
-$metric = 1
+$metric = 0
 $running = 1
 $format = 'kml'
-if cgi.has_key?('metric') && cgi['metric']=='0' then $metric=0 end
+$weight = 66.0
+if cgi.has_key?('metric') && cgi['metric']=='1' then $metric=1 end
 if cgi.has_key?('running') && cgi['running']=='0' then $running=0 end
 if cgi.has_key?('format') && cgi['format']=='text' then $format='text' end
+if cgi.has_key?('weight') then $weight=cgi['weight'].to_f end
 
 infile = Tempfile.new('kcals')
 begin
@@ -107,7 +116,7 @@ begin
   #print "<p>#{Dir.pwd}</p>\n"
   infile << cgi_file.read # copy CGI upload data into temp file, which we will then read back
   #print `cat #{infile.path}`
-  json = `CGI=1 ./kcals.rb verbosity=0 dem=1 metric=#{$metric} running=#{$running} format=#{$format} <#{infile.path}` # verbosity=0 makes it output json data
+  json = `CGI=1 ./kcals.rb verbosity=0 dem=1 metric=#{$metric} running=#{$running} format=#{$format} weight=#{$weight} <#{infile.path}` # verbosity=0 makes it output json data
   print "<!-- #{json} -->\n" # for debugging purposes
   results = JSON.parse(json)
   print format_output(results)
