@@ -2,7 +2,10 @@
 
 # See README.md for documentation.
 
-# to do: out and back option/detection
+# to do:
+#   delete temp files
+# wish list:
+#   out and back option/detection
 
 command_line_parameters=ARGV
 
@@ -197,51 +200,68 @@ if no_alt && $dem then
   # I couldn't get this to work, basically because neither imagemagick nor gimp seems to support 16-bit files.
   # eio clip -o rome.tif --bounds 12.35 41.8 12.65 42
   temp_tif = 'temp.tif'
-  temp_pgm = 'temp.pgm'
+  temp_aig = 'temp.aig'
   box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
   $stderr.print "Attempting to download DEM data, lat-lon box=#{box}.\n"
   shell_out("eio clip -o #{temp_tif} --bounds #{box}") # box is sanitized, because all input have been through .to_f
-  shell_out("convert #{temp_tif} -depth 16 -compress none #{temp_pgm}")
-  head1 = ''
-  head2 = ''
-  head3 = ''
+  shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig}")
+  # read headers first
+  aig_headers = Hash.new
+  File.open(temp_aig,'r') { |f|
+    while(line = f.gets) != nil
+      break unless line=~/\A[a-zA-Z]/ # done with headers
+      if line=~/(\w+)\s+([\.\-0-9]+)/ then
+        key,value = $1,$2
+        aig_headers[key] = value
+      else
+        warning("unrecognized line #{line} in #{temp_aig}")
+      end
+    end    
+  }
+  w = aig_headers['ncols'].to_i
+  h = aig_headers['nrows'].to_i
+  xllcorner = aig_headers['xllcorner'].to_f # longitude in degrees
+  yllcorner = aig_headers['yllcorner'].to_f # latitude in degrees
+  cellsize = aig_headers['cellsize'].to_f # size of each pixel in degrees
+  if w.nil? or h.nil? or xllcorner.nil? or yllcorner.nil? or cellsize.nil? then
+    fatal_error("error reading header lines from file #{temp_aig}, headers=#{aig_headers}")
+  end
+  $stderr.print "w,h=#{w},#{h}\n"
   z_data = nil
-  File.open(temp_pgm,'r') { |f|
-    head1 = f.readline
-    head2 = f.readline
-    head3 = f.readline
-    w,h = 0,0
-    if head2=~/(\d+)\s+(\d+)/ then
-      w,h = $1.to_i,$2.to_i
-    else
-      fatal_error("error reading header line 2 from file #{temp_pgm}")
-    end
-    $stderr.print "w,h=#{w},#{h}\n"
+  File.open(temp_aig,'r') { |f|
     z_data = Array.new(h) { |i| Array.new(w) { |j| 0 }} # z_data[y][x], y going from top to bottom
     ix = 0
     iy = 0
     while(line = f.gets) != nil
+      next if line=~/\A[a-zA-Z]/ # skip headers
       line.split(/\s+/).each { |z|
         next unless z=~/[0-9]/
-        z = z.to_i
-        lsb = z % 256
-        msb = z / 256
-        zz = lsb*256+msb # byte swap
-        $stderr.print "ix=#{ix} iy=#{iy} z=#{z} lsb=#{lsb} msb=#{msb} zz=#{zz}\n" if lsb!=msb
-        z_data[iy][ix] = zz
+        z_data[iy][ix] = z.to_f
         ix = ix+1
         if ix>=w then ix=0; iy=iy+1 end
       }
     end
   }
-  # overwrite the pgm with byte-swapped data so I can inspect it for debugging purposes
-  File.open(temp_pgm,'w') { |f|
-    f.print head1
-    f.print head2
-    f.print head3
-    z_data.each { |row|
-      row.each { |z| f.print "#{z}\n"}
-    }
+  last_ix = 0
+  last_iy = 0
+  i=0
+  path.each { |p|
+    lat,lon,alt = p
+    ix = ((lon-xllcorner)/cellsize).to_i
+    iy = ((lat-yllcorner)/cellsize).to_i
+    if ix<0 or ix>w-1then 
+      warning("ix=#{ix} out of range, set to #{last_ix}")
+      ix = last_ix
+    end
+    if iy<0 or iy>h-1 then 
+      warning("iy=#{iy} out of range, set to #{last_iy}")
+      iy = last_iy
+    end
+    last_ix = ix
+    last_iy = iy
+    z = z_data[iy][ix]
+    path[i] = [lat,lon,z]
+    i=i+1
   }
 end
 
@@ -261,9 +281,12 @@ path.each { |p|
   first=false
 }
 n = cartesian.length
+File.open('path.csv','w') { |f| 
+  f.print path_csv
+}
 
 #print "points read = #{n}\n"
-if n==0 then $stderr.print "error, no points read successfully from input\n"; exit(-1) end
+if n==0 then $stderr.print "error, no points read successfully from input; usually this means you specified the wrong format\n"; exit(-1) end
 
 # definitions of variables:
 #   h,v,d are cumulative horiz, vert, and slope distance
@@ -373,7 +396,4 @@ print "cost = #{"%5.0f" % [kcals]} kcals\n"
 
 File.open('kcals.csv','w') { |f| 
   f.print csv
-}
-File.open('path.csv','w') { |f| 
-  f.print path_csv
 }
