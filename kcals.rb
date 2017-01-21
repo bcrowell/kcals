@@ -286,7 +286,7 @@ path.each { |p|
   break if i>path.length-2
   lat,lon,alt = p
   p2 = path[i+1]
-  lat2,lon2,alt2 = p
+  lat2,lon2,alt2 = p2
   h = pythag(klat*(lat2-lat),klon*(lon2-lon))
   if h>$resolution then
     n = (h/$resolution).to_i+1
