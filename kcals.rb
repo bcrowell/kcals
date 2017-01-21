@@ -212,10 +212,13 @@ format_recognized = false
 if $format=='kml' then
   format_recognized = true
   kml = $stdin.gets(nil) # slurp all of stdin until end of file
-  # xml; relevant part looks like this:
+  # xml; relevant part of mapmyroute output looks like this:
   #    <coordinates>
   #     -117.96391,33.88906,0 -117.96531,33.88905,0 
   #    </coordinates>
+  # GPSbabel output looks like this:
+  #     34.26610, -117.63361, 
+  #     34.26447, -117.63266, 
   # Bug: the following doesn't really parse xml correctly, may not work for xml output that doesn't look like I expect.
   # Should probably look for coords inside <Folder id="Tracks">, but instead just look for one that seems long enough,
   # since the coords I don't want are single points
@@ -224,10 +227,10 @@ if $format=='kml' then
   coords_text = ''
   if kml=~/<coordinates>([^<]{100,})<\/coordinates>/ then # at least 100 characters for the actual path
     coords_text = $1
-    coords_text.split(/\s+/).each { |point|
-      if point=~/(.*),(.*),(.*)/ then
-        path.push([$2.to_f,$1.to_f,$3.to_f])
-      end
+    coords_text.scan(/([0-9\.\-]+),\s*([0-9\.\-]+),\s*([0-9\.\-]*)\s*/).each { |c|
+      lon,lat,alt = c
+      if alt=='' then alt='0.0' end
+      path.push([lat.to_f,lon.to_f,alt.to_f])
     }
   else
     fatal_error("no coordinates element found in input KML file; usually this means that you selected the wrong format")
