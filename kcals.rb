@@ -7,6 +7,13 @@ require 'json'
 # wish list:
 #   out and back option/detection
 
+if $stdin.isatty then
+  print "This program reads a track from standard input in a format such as KML. For documentation, see\n"
+  print "https://github.com/bcrowell/kcals\n"
+  exit(-1)
+end
+
+
 command_line_parameters=ARGV
 
 $cgi = ENV.has_key?("CGI")
@@ -23,6 +30,11 @@ $dem = false # attempt to download DEM if absent from input?
 $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
                # at level 3, when we shell out, stderr and stdout get displayed
                # level 0 means just output some json for use by a script
+$resolution = 30 # The path may contain long pieces that look like straight lines on a map, but are actually
+                 # jagged in terms of elevation profile. Interpolate the polyline to make segments no longer
+                 # than (approximately) this value, in meters. Default of 30 meters is SRTM's resolution.
+$force_dem = false # download DEM data even if elevations are present in the input file, for the reason
+                   # described above in the comment describing $resolution
 
 $warnings = []
 
@@ -68,6 +80,8 @@ def handle_param(s,where)
     if par=='format' then recognized=true; $format=value end
     if par=='dem' then recognized=true; $dem=(value.to_i==1) end
     if par=='verbosity' then recognized=true; $verbosity=value.to_i end
+    if par=='resolution' then recognized=true; $resolution=value.to_f end
+    if par=='force_dem' then recognized=true; $force_dem=(value==1) end
     if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
   else
     fatal_error("illegal syntax#{where}:\n#{s}")
@@ -126,12 +140,19 @@ def deg_to_rad(x)
   return 0.0174532925199433*x
 end
 
+def earth_radius(lat,lon)
+  # https://en.wikipedia.org/wiki/Earth_radius#Geocentric_radius
+  a = 6378137.0 # earth's equatorial radius, in meters
+  b = 6356752.3 # polar radius
+  slat = Math::sin(deg_to_rad(lat))
+  clat = Math::cos(deg_to_rad(lat))
+  return Math::sqrt( ((a*a*clat)**2+(b*b*slat)**2) / ((a*clat)**2+(b*slat)**2)) # radius in meters
+end
+
 def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   # inputs are in degrees, except for alt, which is in meters
   # The purpose of lat0 and lon0 is to do a rotation to make the cartesian coordinates easier to interpret.
   # outputs are in meters
-  a = 6378137.0 # earth's equatorial radius, in meters
-  b = 6356752.3 # polar radius
   lat_rad = deg_to_rad(lat)
   rotate = true # rotate to tangent coordinates?
   lonx = lon
@@ -141,10 +162,7 @@ def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   slon = Math::sin(lon_rad)
   clat = Math::cos(lat_rad)
   clon = Math::cos(lon_rad)
-  slat0 = Math::sin(deg_to_rad(lat0))
-  clat0 = Math::cos(deg_to_rad(lat0))
-  r0 = Math::sqrt( ((a*a*clat0)**2+(b*b*slat0)**2) / ((a*clat0)**2+(b*slat0)**2))
-        # https://en.wikipedia.org/wiki/Earth_radius#Geocentric_radius
+  r0 = earth_radius(lat0,lon0)
         # Use initial latitude and keep r0 constant. If we let r0 vary, then we also need to figure
         # out the direction of the g vector in this model.
   r = r0+alt
@@ -154,6 +172,8 @@ def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   xx = x
   zz = z
   if rotate then
+    slat0 = Math::sin(deg_to_rad(lat0))
+    clat0 = Math::cos(deg_to_rad(lat0))
     xx =  clat0*x+slat0*z
     zz = -slat0*x+clat0*z
   end
@@ -210,7 +230,7 @@ if $format=='kml' then
       end
     }
   else
-    fatal_error("no <coordinates>...</coordinates> element found in input KML file")
+    fatal_error("no coordinates element found in input KML file; usually this means that you selected the wrong format")
   end
 end
 
@@ -248,11 +268,42 @@ path.each { |p|
   alt_hi=alt if alt > alt_hi
 }
 
+def linear_interp(x1,x2,s)
+  return x1+s*(x2-x1)
+end
+
+# Break up long polyline segments into shorter ones by interpolation.
+# See comment near top of code where $resolution is defined to explain why.
+path2 = []
+# For this purpose, we don't need super accurate horizontal distances. Just estimate these using
+# a couple of scale factors.
+r = earth_radius(lat_lo,lon_lo) # just need a rough estimate
+klat = (Math::PI/180.0)*r # meters per degree of latitude
+klon = klat*Math::cos(deg_to_rad(lat_lo)) # ... and longitude
+i=0
+path.each { |p|
+  path2.push(p)
+  break if i>path.length-2
+  lat,lon,alt = p
+  p2 = path[i+1]
+  lat2,lon2,alt2 = p
+  h = pythag(klat*(lat2-lat),klon*(lon2-lon))
+  if h>$resolution then
+    n = (h/$resolution).to_i+1
+    1.upto(n-1) { |i| # we have i=0 and will later automatically get i=n; fill in i=1 to i=n-1
+      s = (i.to_f)/(n.to_f)
+      path2.push([linear_interp(lat,lat2,s),linear_interp(lon,lon2,s),linear_interp(alt,alt2,s)])
+    }
+  end
+  i = i+1
+}
+path = path2
+
 no_alt = alt_lo==0.0 && alt_hi==0.0
 if no_alt && !$dem then
   warning("The input file does not appear to contain any elevation data. Turn on the option 'dem' to try to download this.")
 end
-if no_alt && $dem then
+if $force_dem || (no_alt && $dem) then
   if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
   temp_tif = "#{temp}.tif"
   temp_aig = "#{temp}.aig"
