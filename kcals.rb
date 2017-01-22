@@ -26,7 +26,7 @@ $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height da
             # calculated gain is very sensitive to this
             # putting in this value, which I estimated by eye from a graph, seems to reproduce
             # mapmyrun's figure for total gain
-$format = 'kml' # can be kml or text, where text means the output format of http://www.gpsvisualizer.com/elevation
+$format = 'kml' # see README.md for legal values
 $dem = false # attempt to download DEM if absent from input?
 $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
                # at level 3, when we shell out, stderr and stdout get displayed
@@ -65,7 +65,9 @@ def shell_out(c,additional_error_info='')
 end
 
 def shell_out_low_level(c,additional_error_info,die_on_error)
-  ok = system(c)
+  redir = ''
+  if $cgi then redir='1>/dev/null 2>/dev/null' end
+  ok = system("#{c} #{redir}")
   return [true,''] if ok
   message = "error on shell command #{c}, #{$?}\n#{additional_error_info}"
   if die_on_error then
@@ -216,6 +218,24 @@ def interpolate_raster(z,x,y)
   return z
 end
 
+# import the unicsv format written by gpsbabel:
+def import_csv(file)
+  # csv file looks like:
+  # No,Latitude,Longitude,Name,Altitude,Description
+  # 1,37.732511,-119.558805,"Happy Isles Trail Head",0.0,"Happy Isles Trail Head"
+  a = CSV.open(file, 'r', :headers => true).to_a.map { |row| row.to_hash }
+  #          ... http://technicalpickles.com/posts/parsing-csv-with-ruby/
+  # output array of hashes now looks like (represented as JSON):
+  #   [{"No":"1","Latitude":"37.732511","Longitude":"-119.558805","Name":"Happy Isles Trail Head","Altitude":"0.0"...
+  path = []
+  a.each { |h|
+    alt = 0.0
+    if h.has_key?('Altitude') then alt=h['Altitude'].to_f end
+    path.push([h['Latitude'].to_f,h['Longitude'].to_f,alt])
+  }
+  return path
+end
+
 path = []
 format_recognized = false
 
@@ -228,20 +248,19 @@ if $format=='kml' then
   $temp_files.push(temp_csv)
   $temp_files.push(temp_kml)
   open(temp_kml,'w') { |f| f.print kml }
-  redir = ''
-  if $cgi then redir='2>/dev/null' end
-  ok,err = shell_out_low_level("gpsbabel -t -i kml -f #{temp_kml} -o unicsv -F #{temp_csv} #{redir}",'',false)
+  ok,err = shell_out_low_level("gpsbabel -t -i kml -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
   if !ok then fatal_error("syntax error on KML input; this usually means you specied the wrong format.\n#{err}") end
-  # csv file looks like:
-  # No,Latitude,Longitude,Name,Altitude,Description
-  # 1,37.732511,-119.558805,"Happy Isles Trail Head",0.0,"Happy Isles Trail Head"
-  a = CSV.open(temp_csv, 'r', :headers => true).to_a.map { |row| row.to_hash }
-  # http://technicalpickles.com/posts/parsing-csv-with-ruby/
-  # output array of hashes now looks like (represented as JSON):
-  #   [{"No":"1","Latitude":"37.732511","Longitude":"-119.558805","Name":"Happy Isles Trail Head","Altitude":"0.0"...
-  a.each { |h|
-    path.push([h['Latitude'].to_f,h['Longitude'].to_f,h['Altitude'].to_f])
-  }
+  path = import_csv(temp_csv)
+end
+
+if $format=='csv' then
+  format_recognized = true
+  csv = $stdin.gets(nil) # slurp all of stdin until end of file
+  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
+  temp_csv = "#{temp}_convert.csv"
+  $temp_files.push(temp_csv)
+  open(temp_csv,'w') { |f| f.print csv }
+  path = import_csv(temp_csv)
 end
 
 if $format=='text' then
