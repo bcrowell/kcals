@@ -37,6 +37,9 @@ $resolution = 30 # The path may contain long pieces that look like straight line
 $force_dem = false # download DEM data even if elevations are present in the input file, for the reason
                    # described above in the comment describing $resolution
 
+$server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
+$server_max_points = 2000 # and max number of points
+
 $warnings = []
 
 def clean_up_temp_files
@@ -116,6 +119,8 @@ if !$cgi then
 end
 # then override at command line:
 command_line_parameters.each { |p| handle_param(p,'') }
+
+if $cgi then Dir.chdir("kcals_scratch") end
 
 if $verbosity>=2 then
   print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
@@ -301,15 +306,23 @@ def linear_interp(x1,x2,s)
   return x1+s*(x2-x1)
 end
 
-# Break up long polyline segments into shorter ones by interpolation.
-# See comment near top of code where $resolution is defined to explain why.
-path2 = []
-# For this purpose, we don't need super accurate horizontal distances. Just estimate these using
-# a couple of scale factors.
+# For purposes of a couple of estimates, we don't need super accurate horizontal distances.
+# Just use these scale factors.
 r = earth_radius(lat_lo,lon_lo) # just need a rough estimate
 klat = (Math::PI/180.0)*r # meters per degree of latitude
 klon = klat*Math::cos(deg_to_rad(lat_lo)) # ... and longitude
+
+# Estimate size of job and DEM raster to make sure it isn't too ridiculous for CGI.
+h_diag = pythag(klat*(lat_hi-lat_lo),klon*(lon_hi-lon_lo))
+if h_diag>$server_max && $cgi then
+  fatal_error("Sorry, your route covers too large a region for the server-based application.")
+end
+
+# Break up long polyline segments into shorter ones by interpolation.
+# See comment near top of code where $resolution is defined to explain why.
+path2 = []
 i=0
+h_path = 0 # rough approximation to gauge load on server
 path.each { |p|
   path2.push(p)
   break if i>path.length-2
@@ -317,6 +330,10 @@ path.each { |p|
   p2 = path[i+1]
   lat2,lon2,alt2 = p2
   h = pythag(klat*(lat2-lat),klon*(lon2-lon))
+  h_path = h_path + h
+  if h_path>$server_max && $cgi then
+    fatal_error("Sorry, your route is too long for the server-based application.")
+  end  
   if h>$resolution then
     n = (h/$resolution).to_i+1
     1.upto(n-1) { |i| # we have i=0 and will later automatically get i=n; fill in i=1 to i=n-1
@@ -327,6 +344,10 @@ path.each { |p|
   i = i+1
 }
 path = path2
+
+if path.length>$server_max_points  && $cgi then
+  fatal_error("Sorry, your route is too long for the server-based application.")                               
+end
 
 no_alt = alt_lo==0.0 && alt_hi==0.0
 if no_alt && !$dem then
@@ -346,8 +367,6 @@ if $force_dem || (no_alt && $dem) then
   if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
   redir = "1>#{temp_stdout} 2>#{temp_stderr}";
   if $verbosity>=3 then redir='' end
-  save_dir = Dir.pwd
-  if $cgi then Dir.chdir("kcals_scratch") end
   shell_out('echo "foo" >a.a') # qwe
   if $cgi then # in command-line use, these get marked for deletion below, only after running the commands, so possible
                # error information is preserved
@@ -398,7 +417,6 @@ if $force_dem || (no_alt && $dem) then
       }
     end
   }
-  if $cgi then Dir.chdir(save_dir) end
   last_ix = 0
   last_iy = 0
   i=0
