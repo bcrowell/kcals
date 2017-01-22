@@ -367,13 +367,14 @@ if $force_dem || (no_alt && $dem) then
   if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
   redir = "1>#{temp_stdout} 2>#{temp_stderr}";
   if $verbosity>=3 then redir='' end
-  shell_out('echo "foo" >a.a') # qwe
+  cache_dir_option = ''
   if $cgi then # in command-line use, these get marked for deletion below, only after running the commands, so possible
                # error information is preserved
     $temp_files.push(temp_stderr)
     $temp_files.push(temp_stdout)
+    cache_dir_option = "--cache_dir #{Dir.pwd}"
   end
-  shell_out("eio --cache_dir #{Dir.pwd} clip -o #{temp_tif} --bounds #{box} #{redir}",
+  shell_out("eio #{cache_dir_option} clip -o #{temp_tif} --bounds #{box} #{redir}",
             "Information about the errors may be in the files temp*.stdout and temp*.stderr.") 
           # box is sanitized, because all input have been through .to_f
   shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig} #{redir}")
