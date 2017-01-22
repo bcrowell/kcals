@@ -75,7 +75,7 @@ file, it will download it.
 
 Minimal installation:
 
-apt-get install libjson-ruby
+apt-get install libjson-ruby gpsbabel
 
 To allow downloading of elevation data:
 

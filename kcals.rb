@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 
 require 'json'
+require 'csv' # standard ruby library
 
 # See README.md for documentation.
 
@@ -60,9 +61,18 @@ def warning(message)
 end
 
 def shell_out(c,additional_error_info='')
+  shell_out_low_level(c,additional_error_info,true)
+end
+
+def shell_out_low_level(c,additional_error_info,die_on_error)
   ok = system(c)
-  return true if ok
-  fatal_error("error on shell command #{c}, #{$?}\n#{additional_error_info}")
+  return [true,''] if ok
+  message = "error on shell command #{c}, #{$?}\n#{additional_error_info}"
+  if die_on_error then
+    fatal_error(message)
+  else
+    return [false,message]
+  end
 end
 
 $warned_big_delta = false
@@ -212,29 +222,26 @@ format_recognized = false
 if $format=='kml' then
   format_recognized = true
   kml = $stdin.gets(nil) # slurp all of stdin until end of file
-  # xml; relevant part of mapmyroute output looks like this:
-  #    <coordinates>
-  #     -117.96391,33.88906,0 -117.96531,33.88905,0 
-  #    </coordinates>
-  # GPSbabel output looks like this:
-  #     34.26610, -117.63361, 
-  #     34.26447, -117.63266, 
-  # Bug: the following doesn't really parse xml correctly, may not work for xml output that doesn't look like I expect.
-  # Should probably look for coords inside <Folder id="Tracks">, but instead just look for one that seems long enough,
-  # since the coords I don't want are single points
-  if kml.nil? then fatal_error("empty input file") end
-  kml.gsub!(/\n/,' ') # smash everything to one line
-  coords_text = ''
-  if kml=~/<coordinates>([^<]{100,})<\/coordinates>/ then # at least 100 characters for the actual path
-    coords_text = $1
-    coords_text.scan(/([0-9\.\-]+),\s*([0-9\.\-]+),\s*([0-9\.\-]*)\s*/).each { |c|
-      lon,lat,alt = c
-      if alt=='' then alt='0.0' end
-      path.push([lat.to_f,lon.to_f,alt.to_f])
-    }
-  else
-    fatal_error("no coordinates element found in input KML file; usually this means that you selected the wrong format")
-  end
+  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
+  temp_csv = "#{temp}_convert.csv"
+  temp_kml = "#{temp}_convert.kml"
+  $temp_files.push(temp_csv)
+  $temp_files.push(temp_kml)
+  open(temp_kml,'w') { |f| f.print kml }
+  redir = ''
+  if $cgi then redir='2>/dev/null' end
+  ok,err = shell_out_low_level("gpsbabel -t -i kml -f #{temp_kml} -o unicsv -F #{temp_csv} #{redir}",'',false)
+  if !ok then fatal_error("syntax error on KML input; this usually means you specied the wrong format.\n#{err}") end
+  # csv file looks like:
+  # No,Latitude,Longitude,Name,Altitude,Description
+  # 1,37.732511,-119.558805,"Happy Isles Trail Head",0.0,"Happy Isles Trail Head"
+  a = CSV.open(temp_csv, 'r', :headers => true).to_a.map { |row| row.to_hash }
+  # http://technicalpickles.com/posts/parsing-csv-with-ruby/
+  # output array of hashes now looks like (represented as JSON):
+  #   [{"No":"1","Latitude":"37.732511","Longitude":"-119.558805","Name":"Happy Isles Trail Head","Altitude":"0.0"...
+  a.each { |h|
+    path.push([h['Latitude'].to_f,h['Longitude'].to_f,h['Altitude'].to_f])
+  }
 end
 
 if $format=='text' then
