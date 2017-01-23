@@ -43,6 +43,8 @@ Formats accepted are:
 
 kml - the default
 
+gpx
+
 text - the text format written by gpsvisualizer.com
 
 csv - the unicsv format written by gpsbabel (or any CSV file with some of its columns labeled
@@ -83,15 +85,26 @@ Parameters are:
 
   dem -- 1 means try to download elevation data if it's not included in the input, 0 means don't
 
+## Filtering
+
 Filtering is a parameter with units of meters that defaults to 500, meant to get rid of bogus
-oscillations in the height data, which seem to be present in databases such as SRTM.
+oscillations in the height data, which are often present both
+in GPS tracks and in elevation profiles derived from digital elevation model (DEM) databases such as SRTM.
 To turn off this filtering, set filtering=0.
-Without filtering, you will get noticeable unrealistic wiggles when you graph
-the elevation profile using the CSV output file, and the total gain will be wildly wrong. However, the
+
+When using DEM data without filtering, I have found 
+noticeable unrealistic wiggles when I graph
+the elevation profile using the CSV output file, and the total gain was wildly wrong. However, the
 effect on the calorie expenditure output is actually fairly small.
-If these effects matter to you, and you want maximum precision, then
-I recommend adjusting the value of the filtering parameter in order to reproduce a reliable
-figure for the total gain, e.g., the one output by mapmyrun.
+
+With GPS tracks, filtering seems to greatly improve precision. For instance, I downloaded three different tracks
+that people had posted online for a popular mountain loop in LA (Mount Baldy via Devil's Backbone, descending
+via the Ski Hut trail). Without filtering, the total gain was estimated to be 5340, 4434, and 4716 feet
+based on the three different tracks. With filtering, the estimates were in much better agreement:
+3792, 3853, and 3849 feet.
+
+The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
+
 
 ## Adding elevation data
 

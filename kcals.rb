@@ -244,16 +244,16 @@ end
 path = []
 format_recognized = false
 
-if $format=='kml' then
+if $format=='kml' || $format=='gpx' then
   format_recognized = true
   kml = $stdin.gets(nil) # slurp all of stdin until end of file
   if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
   temp_csv = "#{temp}_convert.csv"
-  temp_kml = "#{temp}_convert.kml"
+  temp_kml = "#{temp}_convert.#{$format}"
   $temp_files.push(temp_csv)
   $temp_files.push(temp_kml)
   open(temp_kml,'w') { |f| f.print kml }
-  ok,err = shell_out_low_level("gpsbabel -t -i kml -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
+  ok,err = shell_out_low_level("gpsbabel -t -i #{$format} -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
   if !ok then fatal_error("syntax error on KML input; this usually means you specied the wrong format.\n#{err}") end
   path = import_csv(temp_csv)
 end
@@ -280,27 +280,36 @@ end
 
 if !format_recognized then fatal_error("unrecognized format: #{$format}") end
 
-path.each { |p|
-  lat,lon,alt = p
-  if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
-  if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
-  if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
-}
-lon_lo = 999.9
-lon_hi = -999.9
-lat_lo = 999.9
-lat_hi = -999.9
-alt_lo = 10000.0
-alt_hi = -10000.0
-path.each { |p|
-  lat,lon,alt = p
-  lon_lo=lon if lon < lon_lo
-  lon_hi=lon if lon > lon_hi
-  lat_lo=lat if lat < lat_lo
-  lat_hi=lat if lat > lat_hi
-  alt_lo=alt if alt < alt_lo
-  alt_hi=alt if alt > alt_hi
-}
+def sanity_check_lat_lon_alt(path)
+  path.each { |p|
+    lat,lon,alt = p
+    if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
+    if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
+    if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
+  }
+end
+
+def get_lat_lon_alt_box(path)
+  lon_lo = 999.9
+  lon_hi = -999.9
+  lat_lo = 999.9
+  lat_hi = -999.9
+  alt_lo = 10000.0
+  alt_hi = -10000.0
+  path.each { |p|
+    lat,lon,alt = p
+    lon_lo=lon if lon < lon_lo
+    lon_hi=lon if lon > lon_hi
+    lat_lo=lat if lat < lat_lo
+    lat_hi=lat if lat > lat_hi
+    alt_lo=alt if alt < alt_lo
+    alt_hi=alt if alt > alt_hi
+  }
+  return [lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
+end
+
+sanity_check_lat_lon_alt(path)
+lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = get_lat_lon_alt_box(path)
 
 def linear_interp(x1,x2,s)
   return x1+s*(x2-x1)
@@ -459,7 +468,6 @@ if !$cgi then
   }
 end
 
-#print "points read = #{n}\n"
 if n==0 then fatal_error("error, no points read successfully from input; usually this means you specified the wrong format") end
 
 # definitions of variables:
@@ -480,7 +488,8 @@ cartesian.each { |p|
     dx,dy,dz=x2-x,y2-y,z2-z
     dl2 = dx*dx+dy*dy+dz*dz
     dv = (dx*x+dy*y+dz*z)/r # dot product of dr with rhat = vertical distance
-    dh = Math::sqrt(dl2-dv*dv) # horizontal distance
+    q = dl2-dv*dv
+    if q>=0.0 then dh = Math::sqrt(q) else dh=0.0 end # horizontal distance
     h = h+dh
     v = v+dv
   end
