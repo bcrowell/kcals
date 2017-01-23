@@ -14,178 +14,18 @@ require 'csv' # standard ruby library
 
 def main
 
-$cgi = ENV.has_key?("CGI")
-
-$metric = false
-$running = true # set to false for walking
-$body_mass = 66 # in kg, =145 lb
-$osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height data
-            # calculated gain is very sensitive to this
-            # putting in this value, which I estimated by eye from a graph, seems to reproduce
-            # mapmyrun's figure for total gain
-$format = 'kml' # see README.md for legal values
-$dem = false # attempt to download DEM if absent from input?
-$verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
-               # at level 3, when we shell out, stderr and stdout get displayed
-               # level 0 means just output some json for use by a script
-$resolution = 30 # The path may contain long pieces that look like straight lines on a map, but are actually
-                 # jagged in terms of elevation profile. Interpolate the polyline to make segments no longer
-                 # than (approximately) this value, in meters. Default of 30 meters is SRTM's resolution.
-$force_dem = false # download DEM data even if elevations are present in the input file, for the reason
-                   # described above in the comment describing $resolution
-
-$server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
-$server_max_points = 2000 # and max number of points
-
-$warnings = []
-$warned_big_delta = false
-
-$temp_files = []
-
+init_globals
 command_line_params = ARGV
 input_file = get_parameters("#{Dir.home}/.kcals",command_line_params)
-
 if $cgi then Dir.chdir("kcals_scratch") end
-
-if input_file.nil?
-  if $stdin.isatty then fatal_error("This program reads a track from standard input in a format such as KML. For documentation, see https://github.com/bcrowell/kcals") end
-  data = $stdin.gets(nil) # slurp all of stdin until end of file
-else
-  data = slurp_file(input_file)
-end
-path = read_track($format,data)
+path = get_track(input_file) # may have side-effect of creating temp files in cwd
 
 sanity_check_lat_lon_alt(path)
-lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = get_lat_lon_alt_box(path)
+box = get_lat_lon_alt_box(path)
+lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
 
-# For purposes of a couple of estimates, we don't need super accurate horizontal distances.
-# Just use these scale factors.
-r = earth_radius(lat_lo,lon_lo) # just need a rough estimate
-klat = (Math::PI/180.0)*r # meters per degree of latitude
-klon = klat*Math::cos(deg_to_rad(lat_lo)) # ... and longitude
-
-# Estimate size of job and DEM raster to make sure it isn't too ridiculous for CGI.
-h_diag = pythag(klat*(lat_hi-lat_lo),klon*(lon_hi-lon_lo))
-if h_diag>$server_max && $cgi then
-  fatal_error("Sorry, your route covers too large a region for the server-based application.")
-end
-
-# Break up long polyline segments into shorter ones by interpolation.
-# See comment near top of code where $resolution is defined to explain why.
-path2 = []
-i=0
-h_path = 0 # rough approximation to gauge load on server
-path.each { |p|
-  path2.push(p)
-  break if i>path.length-2
-  lat,lon,alt = p
-  p2 = path[i+1]
-  lat2,lon2,alt2 = p2
-  h = pythag(klat*(lat2-lat),klon*(lon2-lon))
-  h_path = h_path + h
-  if h_path>$server_max && $cgi then
-    fatal_error("Sorry, your route is too long for the server-based application.")
-  end  
-  if h>$resolution then
-    n = (h/$resolution).to_i+1
-    1.upto(n-1) { |i| # we have i=0 and will later automatically get i=n; fill in i=1 to i=n-1
-      s = (i.to_f)/(n.to_f)
-      path2.push([linear_interp(lat,lat2,s),linear_interp(lon,lon2,s),linear_interp(alt,alt2,s)])
-    }
-  end
-  i = i+1
-}
-path = path2
-
-if path.length>$server_max_points  && $cgi then
-  fatal_error("Sorry, your route is too long for the server-based application.")                               
-end
-
-no_alt = alt_lo==0.0 && alt_hi==0.0
-if no_alt && !$dem then
-  warning("The input file does not appear to contain any elevation data. Turn on the option 'dem' to try to download this.")
-end
-if $force_dem || (no_alt && $dem) then
-  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
-  temp_tif = "#{temp}.tif"
-  temp_aig = "#{temp}.aig"
-  temp_stderr = "#{temp}.stderr"
-  temp_stdout = "#{temp}.stdout"
-  $temp_files.push(temp_tif)
-  $temp_files.push(temp_aig)
-  $temp_files.push("#{temp}.prj")
-  $temp_files.push("#{temp}.aig.aux.xml")
-  box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
-  if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
-  redir = "1>#{temp_stdout} 2>#{temp_stderr}";
-  if $verbosity>=3 then redir='' end
-  cache_dir_option = ''
-  if $cgi then # in command-line use, these get marked for deletion below, only after running the commands, so possible
-               # error information is preserved
-    $temp_files.push(temp_stderr)
-    $temp_files.push(temp_stdout)
-    cache_dir_option = "--cache_dir #{Dir.pwd}"
-  end
-  shell_out("eio #{cache_dir_option} clip -o #{temp_tif} --bounds #{box} #{redir}",
-            "Information about the errors may be in the files temp*.stdout and temp*.stderr.") 
-          # box is sanitized, because all input have been through .to_f
-  shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig} #{redir}")
-  if !$cgi then
-    $temp_files.push(temp_stderr) # mark them for deletion now, since no interesting error messages in them
-    $temp_files.push(temp_stdout)
-  end
-  # read headers first
-  aig_headers = Hash.new
-  File.open(temp_aig,'r') { |f|
-    while(line = f.gets) != nil
-      break unless line=~/\A[a-zA-Z]/ # done with headers
-      if line=~/(\w+)\s+([\.\-0-9]+)/ then
-        key,value = $1,$2
-        aig_headers[key] = value
-      else
-        warning("unrecognized line #{line} in #{temp_aig}")
-      end
-    end    
-  }
-  w = aig_headers['ncols'].to_i
-  h = aig_headers['nrows'].to_i
-  xllcorner = aig_headers['xllcorner'].to_f # longitude in degrees
-  yllcorner = aig_headers['yllcorner'].to_f # latitude in degrees
-  cellsize = aig_headers['cellsize'].to_f # size of each pixel in degrees
-  if w.nil? or h.nil? or xllcorner.nil? or yllcorner.nil? or cellsize.nil? then
-    fatal_error("error reading header lines from file #{temp_aig}, headers=#{aig_headers}")
-  end
-  z_data = nil
-  File.open(temp_aig,'r') { |f|
-    z_data = Array.new(h) { |i| Array.new(w) { |j| 0 }} # z_data[y][x], y going from top to bottom
-    ix = 0
-    iy = 0
-    while(line = f.gets) != nil
-      next if line=~/\A[a-zA-Z]/ # skip headers
-      line.split(/\s+/).each { |z|
-        next unless z=~/[0-9]/
-        z_data[iy][ix] = z.to_f
-        ix = ix+1
-        if ix>=w then ix=0; iy=iy+1 end
-      }
-    end
-  }
-  last_ix = 0
-  last_iy = 0
-  i=0
-  path.each { |p|
-    lat,lon,alt = p
-    x = (lon-xllcorner)/cellsize # in array-index units, but floating point
-    y = h-(lat-yllcorner)/cellsize
-    if x<0.0 then x=0.0 end
-    if x>w-1 then x=(w-1.0001).to_f end
-    if y<0.0 then y=0.0 end
-    if y>h-1 then y=(h-1.0001).to_f end
-    z = interpolate_raster(z_data,x,y)
-    path[i] = [lat,lon,z]
-    i=i+1
-  }
-end
+path = add_resolution_and_check_size_limit(path,box)
+path = add_dem_or_warn_if_appropriate(path,box)
 
 csv = "horizontal,vertical,dh,dv\n"
 path_csv = "lat,lon,alt,x,y,z\n"
@@ -340,6 +180,203 @@ end
 
 clean_up_temp_files
 
+end
+
+#=========================================================================
+# @@ helper routines for main
+#=========================================================================
+
+def get_track(input_file)
+  if input_file.nil?
+    if $stdin.isatty then fatal_error("This program reads a track from standard input in a format such as KML. For documentation, see https://github.com/bcrowell/kcals") end
+    data = $stdin.gets(nil) # slurp all of stdin until end of file
+  else
+    data = slurp_file(input_file)
+  end
+  return read_track($format,data)
+end
+
+def init_globals
+  $cgi = ENV.has_key?("CGI")
+
+  $metric = false
+  $running = true # set to false for walking
+  $body_mass = 66 # in kg, =145 lb
+  $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height data
+              # calculated gain is very sensitive to this
+              # putting in this value, which I estimated by eye from a graph, seems to reproduce
+              # mapmyrun's figure for total gain
+  $format = 'kml' # see README.md for legal values
+  $dem = false # attempt to download DEM if absent from input?
+  $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
+                 # at level 3, when we shell out, stderr and stdout get displayed
+                 # level 0 means just output some json for use by a script
+  $resolution = 30 # The path may contain long pieces that look like straight lines on a map, but are actually
+                   # jagged in terms of elevation profile. Interpolate the polyline to make segments no longer
+                   # than (approximately) this value, in meters. Default of 30 meters is SRTM's resolution.
+  $force_dem = false # download DEM data even if elevations are present in the input file, for the reason
+                     # described above in the comment describing $resolution
+
+  $server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
+  $server_max_points = 2000 # and max number of points
+
+  $warnings = []
+  $warned_big_delta = false
+
+  $temp_files = []
+
+end
+
+#=========================================================================
+# @@ filtering of tracks
+#=========================================================================
+
+def add_dem_or_warn_if_appropriate(path,box)
+  lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
+  no_alt = alt_lo==0.0 && alt_hi==0.0
+  if no_alt && !$dem then
+    warning("The input file does not appear to contain any elevation data. Turn on the option 'dem' to try to download this.")
+  end
+  if $force_dem || (no_alt && $dem) then
+    path = add_dem(path,box)
+  end
+  return path
+end
+
+def add_resolution_and_check_size_limit(path,box)
+  # Break up long polyline segments into shorter ones by interpolation.
+  # See comment near top of code where $resolution is defined to explain why.
+  # If running as CGI, perform a rough estimate of the size of the dataset, and throw an error if too big.
+  # Otherwise, return the new version of the path.
+
+  lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
+
+  # For purposes of a couple of estimates, we don't need super accurate horizontal distances.
+  # Just use these scale factors.
+  r = earth_radius(lat_lo,lon_lo) # just need a rough estimate
+  klat = (Math::PI/180.0)*r # meters per degree of latitude
+  klon = klat*Math::cos(deg_to_rad(lat_lo)) # ... and longitude
+
+  # Estimate size of job and DEM raster to make sure it isn't too ridiculous for CGI.
+  h_diag = pythag(klat*(lat_hi-lat_lo),klon*(lon_hi-lon_lo))
+  if h_diag>$server_max && $cgi then
+    fatal_error("Sorry, your route covers too large a region for the server-based application.")
+  end
+
+  path2 = []
+  i=0
+  h_path = 0 # rough approximation to gauge load on server
+  path.each { |p|
+    path2.push(p)
+    break if i>path.length-2
+    lat,lon,alt = p
+    p2 = path[i+1]
+    lat2,lon2,alt2 = p2
+    h = pythag(klat*(lat2-lat),klon*(lon2-lon))
+    h_path = h_path + h
+    if h_path>$server_max && $cgi then
+      fatal_error("Sorry, your route is too long for the server-based application.")
+    end  
+    if h>$resolution then
+      n = (h/$resolution).to_i+1
+      1.upto(n-1) { |i| # we have i=0 and will later automatically get i=n; fill in i=1 to i=n-1
+        s = (i.to_f)/(n.to_f)
+        path2.push([linear_interp(lat,lat2,s),linear_interp(lon,lon2,s),linear_interp(alt,alt2,s)])
+      }
+    end
+    i = i+1
+  }
+
+  if path.length>$server_max_points  && $cgi then
+    fatal_error("Sorry, your route is too long for the server-based application.")                               
+  end
+
+  return path2
+end
+
+def add_dem(path,box)
+  lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
+  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
+  temp_tif = "#{temp}.tif"
+  temp_aig = "#{temp}.aig"
+  temp_stderr = "#{temp}.stderr"
+  temp_stdout = "#{temp}.stdout"
+  $temp_files.push(temp_tif)
+  $temp_files.push(temp_aig)
+  $temp_files.push("#{temp}.prj")
+  $temp_files.push("#{temp}.aig.aux.xml")
+  box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
+  if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
+  redir = "1>#{temp_stdout} 2>#{temp_stderr}";
+  if $verbosity>=3 then redir='' end
+  cache_dir_option = ''
+  if $cgi then # in command-line use, these get marked for deletion below, only after running the commands, so possible
+               # error information is preserved
+    $temp_files.push(temp_stderr)
+    $temp_files.push(temp_stdout)
+    cache_dir_option = "--cache_dir #{Dir.pwd}"
+  end
+  shell_out("eio #{cache_dir_option} clip -o #{temp_tif} --bounds #{box} #{redir}",
+            "Information about the errors may be in the files temp*.stdout and temp*.stderr.") 
+          # box is sanitized, because all input have been through .to_f
+  shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig} #{redir}")
+  if !$cgi then
+    $temp_files.push(temp_stderr) # mark them for deletion now, since no interesting error messages in them
+    $temp_files.push(temp_stdout)
+  end
+  # read headers first
+  aig_headers = Hash.new
+  File.open(temp_aig,'r') { |f|
+    while(line = f.gets) != nil
+      break unless line=~/\A[a-zA-Z]/ # done with headers
+      if line=~/(\w+)\s+([\.\-0-9]+)/ then
+        key,value = $1,$2
+        aig_headers[key] = value
+      else
+        warning("unrecognized line #{line} in #{temp_aig}")
+      end
+    end    
+  }
+  w = aig_headers['ncols'].to_i
+  h = aig_headers['nrows'].to_i
+  xllcorner = aig_headers['xllcorner'].to_f # longitude in degrees
+  yllcorner = aig_headers['yllcorner'].to_f # latitude in degrees
+  cellsize = aig_headers['cellsize'].to_f # size of each pixel in degrees
+  if w.nil? or h.nil? or xllcorner.nil? or yllcorner.nil? or cellsize.nil? then
+    fatal_error("error reading header lines from file #{temp_aig}, headers=#{aig_headers}")
+  end
+  z_data = nil
+  File.open(temp_aig,'r') { |f|
+    z_data = Array.new(h) { |i| Array.new(w) { |j| 0 }} # z_data[y][x], y going from top to bottom
+    ix = 0
+    iy = 0
+    while(line = f.gets) != nil
+      next if line=~/\A[a-zA-Z]/ # skip headers
+      line.split(/\s+/).each { |z|
+        next unless z=~/[0-9]/
+        z_data[iy][ix] = z.to_f
+        ix = ix+1
+        if ix>=w then ix=0; iy=iy+1 end
+      }
+    end
+  }
+  last_ix = 0
+  last_iy = 0
+  i=0
+  path2 = []
+  path.each { |p|
+    lat,lon,alt = p
+    x = (lon-xllcorner)/cellsize # in array-index units, but floating point
+    y = h-(lat-yllcorner)/cellsize
+    if x<0.0 then x=0.0 end
+    if x>w-1 then x=(w-1.0001).to_f end
+    if y<0.0 then y=0.0 end
+    if y>h-1 then y=(h-1.0001).to_f end
+    z = interpolate_raster(z_data,x,y)
+    path2[i] = [lat,lon,z]
+    i=i+1
+  }
+  return path2
 end
 
 #=========================================================================
