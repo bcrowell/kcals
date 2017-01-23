@@ -33,9 +33,10 @@ synopsis:
 `kcals.rb filtering=600 weight=58 route.txt` ... final parameter interpreted as input file, format inferred
 
 The input formats that are supported are KML and the text format
-written by gpsvisualizer.com.  Writes total stats to stdout. Also
-writes some spreadsheet data to profile.csv, which can be used to graph
-the elevation profile. 
+written by gpsvisualizer.com.  Total stats are written to standard output.
+
+Also writes some spreadsheet data to profile.csv and path.csv.
+The profile.csv file can be used to graph the elevation profile. 
 
 ## Input files
 

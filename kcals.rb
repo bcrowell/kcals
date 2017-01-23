@@ -27,139 +27,22 @@ lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
 path = add_resolution_and_check_size_limit(path,box)
 path = add_dem_or_warn_if_appropriate(path,box)
 
-csv = "horizontal,vertical,dh,dv\n"
-
 cartesian = to_cartesian(path)
 if !$cgi then make_path_csv(path,cartesian) end
 
 n = cartesian.length
 
+hv = integrate_horiz_and_vert(cartesian)
+  # list of [horiz,vert] positions
+hv = filter_elevation(hv) # get rid of bogus fluctations
 
+h = hv.last[0]
 
-# definitions of variables:
-#   h,v,d are cumulative horiz, vert, and slope distance
-#   their increments are dh,dv,dd
+c,d,gain = integrate_gain_and_energy(hv)
 
-hv = [] # array of [h,v]
-first=true
-x,y,z = 0,0,0
-i=0
-h=0
-v=0
-cartesian.each { |p|
-  r,x2,y2,z2 = p
-  if first then 
-    first=false
-  else
-    dx,dy,dz=x2-x,y2-y,z2-z
-    dl2 = dx*dx+dy*dy+dz*dz
-    dv = (dx*x+dy*y+dz*z)/r # dot product of dr with rhat = vertical distance
-    q = dl2-dv*dv
-    if q>=0.0 then dh = Math::sqrt(q) else dh=0.0 end # horizontal distance
-    h = h+dh
-    v = v+dv
-  end
-  if i>0 && dh>10000.0 then
-    if !$warned_big_delta then
-      warning("Two successive points are more than 10 km apart horizontally: dx=#{dx}, dy=#{dy}, dx=#{dz}.")
-      $warned_big_delta = true
-    end
-  end
-  hv.push([h,v]) # in first iteration, is [0,0]
-  # if i<10 then print "#{"%9.2f" % [h]},#{"%9.2f" % [v]}\n" end
-  x,y,z=x2,y2,z2
-  i = i+1
-}
+if !$cgi then make_profile_csv(hv) end
 
-# filtering to get rid of artifacts of bad digital elevation model, which have a big effect
-# on calculations of gain
-
-hv2 = []
-hv.each { |a|
-  h,v = a
-
-  v_av = 0
-  n_av = 0
-  hv.each { |b|
-    hh,vv = b
-    if (hh-h).abs<($osc_h+0.01)/2.0 then
-      # print " yes\n"
-      v_av = v_av+vv
-      n_av = n_av+1
-    end
-  }
-  if n_av<1 then fatal_error("n_av<1?? at h,v=#{h},#{v}") end
-  v = v_av/n_av
-
-  hv2.push([h,v])
-}
-hv = hv2
-
-# integrate to find total gain, calories burned
-h = 0 # total horizontal distance
-v = 0 # total vertical distance (=0 at end of a loop)
-d = 0 # total distance along the slope
-gain = 0 # total gain
-c = 0 # cost in joules
-first = true
-old_h = 0
-old_v = 0
-hv.each { |a|
-  h,v = a
-  if !first then
-    dh = h-old_h
-    dv = v-old_v
-    dd = Math::sqrt(dh*dh+dv*dv)
-    d = d+dd
-    if dv>0 then gain=gain+dv end
-    i=0
-    if dh>0 then i=dv/dh end
-    c = c+dd*$body_mass*minetti(i)
-         # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
-    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]}\n"
-  end
-  old_h = h
-  old_v = v
-  first = false
-}
-
-
-
-if $metric then
-  h_unit = "km"
-  v_unit = "m"
-  h = h/1000.0
-  d = d/1000.0
-else
-  h_unit = "mi"
-  v_unit = "ft"
-  h = (h/1000.0)*0.621371
-  d = (d/1000.0)*0.621371
-  gain = gain*3.28084
-end
-kcals = c*0.000239006
-if $verbosity>=2 then
-  print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
-end
-if $verbosity>0 then
-  print "horizontal distance = #{"%.2f" % [h]} #{h_unit}\n"
-  print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
-  print "gain = #{"%.0f" % [gain]} #{v_unit}\n"
-  print "cost = #{"%.0f" % [kcals]} kcals\n"
-else
-  print JSON.generate({'horiz'=>("%.2f" % [h]),'horiz_unit'=>h_unit,
-                 'slope_distance'=>("%.2f" % [d]),
-                 'gain'=>("%.0f" % [gain]),'vert_unit'=>v_unit,
-                 'cost'=>("%.0f" % [kcals]),
-                 'warnings'=>$warnings
-           })+"\n"
-end
-
-if !$cgi then
-  File.open('profile.csv','w') { |f| 
-    f.print csv
-  }
-end
+print_stats(h,d,gain,c)
 
 clean_up_temp_files
 
@@ -168,6 +51,38 @@ end
 #=========================================================================
 # @@ helper routines for main
 #=========================================================================
+
+def print_stats(h,d,gain,c)
+  if $metric then
+    h_unit = "km"
+    v_unit = "m"
+    h = h/1000.0
+    d = d/1000.0
+  else
+    h_unit = "mi"
+    v_unit = "ft"
+    h = (h/1000.0)*0.621371
+    d = (d/1000.0)*0.621371
+    gain = gain*3.28084
+  end
+  kcals = c*0.000239006
+  if $verbosity>=2 then
+    print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+  end
+  if $verbosity>0 then
+    print "horizontal distance = #{"%.2f" % [h]} #{h_unit}\n"
+    print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
+    print "gain = #{"%.0f" % [gain]} #{v_unit}\n"
+    print "cost = #{"%.0f" % [kcals]} kcals\n"
+  else
+    print JSON.generate({'horiz'=>("%.2f" % [h]),'horiz_unit'=>h_unit,
+                   'slope_distance'=>("%.2f" % [d]),
+                   'gain'=>("%.0f" % [gain]),'vert_unit'=>v_unit,
+                   'cost'=>("%.0f" % [kcals]),
+                   'warnings'=>$warnings
+             })+"\n"
+  end
+end
 
 def get_track(input_file)
   if input_file.nil?
@@ -226,9 +141,130 @@ def make_path_csv(path,cartesian)
   }
 end
 
+def make_profile_csv(hv)
+  csv = "horizontal,vertical,dh,dv\n"
+  first = true
+  old_h = 0
+  old_v = 0
+  hv.each { |a|
+    h,v = a
+    if !first then
+      dh = h-old_h
+      dv = v-old_v
+    else
+      dh = 0.0
+      dv = 0.0
+    end
+    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]}\n"
+    old_h = h
+    old_v = v
+    first = false
+  }
+  File.open('profile.csv','w') { |f| 
+    f.print csv
+  }
+end
+
+#=========================================================================
+# @@ integration of results
+#=========================================================================
+
+def integrate_gain_and_energy(hv)
+  # integrate to find total gain, slope distance, and energy burned
+  h = 0 # total horizontal distance
+  v = 0 # total vertical distance (=0 at end of a loop)
+  d = 0 # total distance along the slope
+  gain = 0 # total gain
+  c = 0 # cost in joules
+  first = true
+  old_h = 0
+  old_v = 0
+  hv.each { |a|
+    h,v = a
+    if !first then
+      dh = h-old_h
+      dv = v-old_v
+      dd = Math::sqrt(dh*dh+dv*dv)
+      d = d+dd
+      if dv>0 then gain=gain+dv end
+      i=0
+      if dh>0 then i=dv/dh end
+      c = c+dd*$body_mass*minetti(i)
+           # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
+    end
+    old_h = h
+    old_v = v
+    first = false
+  }
+  return [c,d,gain]
+end
+
+def integrate_horiz_and_vert(cartesian)
+  # definitions of variables:
+  #   h,v,d are cumulative horiz, vert, and slope distance
+  #   their increments are dh,dv,dd
+  # returns list of [h,v]
+  # May have side-effect of warning about big jumps in data that don't make sense.
+  hv = [] # array of [h,v]
+  first=true
+  x,y,z = 0,0,0
+  i=0
+  h=0
+  v=0
+  cartesian.each { |p|
+    r,x2,y2,z2 = p
+    if first then 
+      first=false
+    else
+      dx,dy,dz=x2-x,y2-y,z2-z
+      dl2 = dx*dx+dy*dy+dz*dz
+      dv = (dx*x+dy*y+dz*z)/r # dot product of dr with rhat = vertical distance
+      q = dl2-dv*dv
+      if q>=0.0 then dh = Math::sqrt(q) else dh=0.0 end # horizontal distance
+      h = h+dh
+      v = v+dv
+    end
+    if i>0 && dh>10000.0 then
+      if !$warned_big_delta then
+        warning("Two successive points are more than 10 km apart horizontally: dx=#{dx}, dy=#{dy}, dx=#{dz}.")
+        $warned_big_delta = true
+      end
+    end
+    hv.push([h,v]) # in first iteration, is [0,0]
+    # if i<10 then print "#{"%9.2f" % [h]},#{"%9.2f" % [v]}\n" end
+    x,y,z=x2,y2,z2
+    i = i+1
+  }
+  return hv
+end
+
 #=========================================================================
 # @@ filtering of tracks
 #=========================================================================
+
+def filter_elevation(hv)
+  # hv = list of [horiz,vert] positions
+  # filtering to get rid of artifacts of bad digital elevation model, which have a big effect
+  # on calculations of gain
+  # bug: this is an O(n^2) algorithm, can be made into O(n)
+  hv2 = []
+  hv.each { |a|
+    h,v = a
+    v_av = 0
+    n_av = 0
+    hv.each { |b|
+      hh,vv = b
+      if (hh-h).abs<($osc_h+0.01)/2.0 then
+        v_av = v_av+vv
+        n_av = n_av+1
+      end
+    }
+    if n_av<1 then fatal_error("n_av<1?? at h,v=#{h},#{v}") end
+    v = v_av/n_av
+    hv2.push([h,v])
+  }
+  return hv2
+end
 
 def to_cartesian(path)
   cartesian = [] # array of [r,x,y,z]
