@@ -28,30 +28,13 @@ path = add_resolution_and_check_size_limit(path,box)
 path = add_dem_or_warn_if_appropriate(path,box)
 
 csv = "horizontal,vertical,dh,dv\n"
-path_csv = "lat,lon,alt,x,y,z\n"
 
-cartesian = [] # array of [r,x,y,z]
-first = true
-lat0 = 0
-lon0 = 0
-path.each { |p|
-  lat,lon,alt = p # in degrees, degrees, meters
-  if first then lat0=lat; lon0=lon end
-        # ... for convenience of visualization and interp, and also to fix radius of earth at initial value
-  cart = spherical_to_cartesian(lat,lon,alt,lat0,lon0)
-  path_csv = path_csv + "#{lat},#{lon},#{alt},#{cart[0]},#{cart[1]},#{cart[2]}\n"
-  cartesian.push(cart)
-  first=false
-}
+cartesian = to_cartesian(path)
+if !$cgi then make_path_csv(path,cartesian) end
+
 n = cartesian.length
 
-if !$cgi then
-  File.open('path.csv','w') { |f| 
-    f.print path_csv
-  }
-end
 
-if n==0 then fatal_error("error, no points read successfully from input; usually this means you specified the wrong format") end
 
 # definitions of variables:
 #   h,v,d are cumulative horiz, vert, and slope distance
@@ -193,7 +176,9 @@ def get_track(input_file)
   else
     data = slurp_file(input_file)
   end
-  return read_track($format,data)
+  path = read_track($format,data)
+  if path.length==0 then fatal_error("error, no points read successfully from input; usually this means you specified the wrong format") end
+  return path
 end
 
 def init_globals
@@ -227,9 +212,39 @@ def init_globals
 
 end
 
+def make_path_csv(path,cartesian)
+  path_csv = "lat,lon,alt,x,y,z\n"
+  i = 0
+  path.each { |p|
+    lat,lon,alt = p # in degrees, degrees, meters
+    cart = cartesian[i]
+    path_csv = path_csv + "#{lat},#{lon},#{alt},#{cart[0]},#{cart[1]},#{cart[2]}\n"
+    i = i+1
+  }
+  File.open('path.csv','w') { |f| 
+    f.print path_csv
+  }
+end
+
 #=========================================================================
 # @@ filtering of tracks
 #=========================================================================
+
+def to_cartesian(path)
+  cartesian = [] # array of [r,x,y,z]
+  first = true
+  lat0 = 0
+  lon0 = 0
+  path.each { |p|
+    lat,lon,alt = p # in degrees, degrees, meters
+    if first then lat0=lat; lon0=lon end
+          # ... for convenience of visualization and interp, and also to fix radius of earth at initial value
+    cart = spherical_to_cartesian(lat,lon,alt,lat0,lon0)
+    cartesian.push(cart)
+    first=false
+  }
+  return cartesian
+end
 
 def add_dem_or_warn_if_appropriate(path,box)
   lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
