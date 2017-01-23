@@ -8,6 +8,12 @@ require 'csv' # standard ruby library
 # wish list:
 #   out and back option/detection
 
+#=========================================================================
+# @@ main
+#=========================================================================
+
+def main
+
 if $stdin.isatty then
   print "This program reads a track from standard input in a format such as KML. For documentation, see\n"
   print "https://github.com/bcrowell/kcals\n"
@@ -42,231 +48,6 @@ $warned_big_delta = false
 
 $temp_files = []
 
-def clean_up_temp_files
-  shell_out("rm -f #{$temp_files.join(' ')}")
-end
-
-def fatal_error(message)
-  if $verbosity>=1 && !$cgi then
-    $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
-  else
-    print JSON.generate({'error'=>message})+"\n"
-  end
-  exit(-1)
-end
-
-def warning(message)
-  if $verbosity>=1 && !$cgi then
-    $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
-  else
-    $warnings.push(message)
-  end
-end
-
-def shell_out(c,additional_error_info='')
-  shell_out_low_level(c,additional_error_info,true)
-end
-
-def shell_out_low_level(c,additional_error_info,die_on_error)
-  redir = ''
-  if $cgi then redir='1>/dev/null 2>/dev/null' end
-  ok = system("#{c} #{redir}")
-  return [true,''] if ok
-  message = "error on shell command #{c}, #{$?}\n#{additional_error_info}"
-  if die_on_error then
-    fatal_error(message)
-  else
-    return [false,message]
-  end
-end
-
-def handle_param(s,where)
-  if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
-    par,value = $1,$2
-    recognized = false
-    if par=='metric' then recognized=true; $metric=(value.to_i==1) end
-    if par=='running' then recognized=true; $running=(value.to_i==1) end
-    if par=='weight' then recognized=true; $body_mass=value.to_f end
-    if par=='filtering' then recognized=true; $osc_h=value.to_f end
-    if par=='format' then recognized=true; $format=value end
-    if par=='dem' then recognized=true; $dem=(value.to_i==1) end
-    if par=='verbosity' then recognized=true; $verbosity=value.to_i end
-    if par=='resolution' then recognized=true; $resolution=value.to_f end
-    if par=='force_dem' then recognized=true; $force_dem=(value==1) end
-    if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
-  else
-    fatal_error("illegal syntax#{where}:\n#{s}")
-  end
-end
-
-def get_parameters(prefs_file,command_line_parameters)
-  # first read from prefs file:
-  if !$cgi then
-    prefs = "#{Dir.home}/.kcals"
-    begin
-      open(prefs,'r') { |f|
-        f.each_line {|line|
-          next if line=~/\A\s*\Z/
-          handle_param(line," in #{prefs}")
-        }
-      }
-    rescue
-      warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
-    end
-  end
-  # then override at command line:
-  command_line_parameters.each { |p| handle_param(p,'') }
-end
-
-# For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
-
-def minetti(i)
-  if $running then return minetti_cr(i) else return minetti_cw(i) end
-end
-
-def in_minetti_range(i)
-  return -0.5 if i<-0.5
-  return 0.5 if i>0.5
-  return i
-end
-
-def minetti_cr(i)
-  # i = gradient
-  # cr = cost of running, in J/kg.m
-  i = in_minetti_range(i)
-  return 155.4*i**5-30.4*i**4-43.3*i**3+46.3*i**2+19.5*i+3.6
-  # note that the 3.6 is different from their best value of 3.4 on the flats, i.e., the polynomial isn't a perfect fit
-end
-
-def minetti_cw(i)
-  # i = gradient
-  # cr = cost of walking, in J/kg.m
-  i = in_minetti_range(i)
-  return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
-end
-
-def deg_to_rad(x)
-  return 0.0174532925199433*x
-end
-
-def earth_radius(lat,lon)
-  # https://en.wikipedia.org/wiki/Earth_radius#Geocentric_radius
-  a = 6378137.0 # earth's equatorial radius, in meters
-  b = 6356752.3 # polar radius
-  slat = Math::sin(deg_to_rad(lat))
-  clat = Math::cos(deg_to_rad(lat))
-  return Math::sqrt( ((a*a*clat)**2+(b*b*slat)**2) / ((a*clat)**2+(b*slat)**2)) # radius in meters
-end
-
-def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
-  # inputs are in degrees, except for alt, which is in meters
-  # The purpose of lat0 and lon0 is to do a rotation to make the cartesian coordinates easier to interpret.
-  # outputs are in meters
-  lat_rad = deg_to_rad(lat)
-  rotate = true # rotate to tangent coordinates?
-  lonx = lon
-  if rotate then lonx=lon-lon0 end
-  lon_rad = deg_to_rad(lonx)
-  slat = Math::sin(lat_rad)
-  slon = Math::sin(lon_rad)
-  clat = Math::cos(lat_rad)
-  clon = Math::cos(lon_rad)
-  r0 = earth_radius(lat0,lon0)
-        # Use initial latitude and keep r0 constant. If we let r0 vary, then we also need to figure
-        # out the direction of the g vector in this model.
-  r = r0+alt
-  x = r*clat*clon
-  y = r*clat*slon
-  z = r*slat
-  xx = x
-  zz = z
-  if rotate then
-    slat0 = Math::sin(deg_to_rad(lat0))
-    clat0 = Math::cos(deg_to_rad(lat0))
-    xx =  clat0*x+slat0*z
-    zz = -slat0*x+clat0*z
-  end
-  return [r,xx,y,zz]
-end
-
-def pythag(x,y)
-  return Math::sqrt(x*x+y*y)
-end
-
-def interpolate_square(x,y,z00,z10,z01,z11)
-  root2 = Math::sqrt(2.0)
-  w00 = (root2-pythag(x,y)).abs
-  w10 = (root2-pythag(x-1.0,y)).abs
-  w01 = (root2-pythag(x,y-1.0)).abs
-  w11 = (root2-pythag(x-1.0,y-1.0)).abs
-  norm = w00+w10+w01+w11
-  z = (z00*w00+z10*w10+z01*w01+z11*w11)/norm
-  return z
-end
-
-def linear_interp(x1,x2,s)
-  return x1+s*(x2-x1)
-end
-
-def interpolate_raster(z,x,y)
-  # z = array[iy][ix]
-  # x,y = floating point, in array-index units
-  ix = x.to_i
-  iy = y.to_i
-  fx = x-ix # fractional part
-  fy = y-iy
-  z = interpolate_square(fx,fy,z[iy][ix],z[iy][ix+1],z[iy+1][ix],z[iy+1][ix+1])  
-  return z
-end
-
-# import the unicsv format written by gpsbabel:
-def import_csv(file)
-  # csv file looks like:
-  # No,Latitude,Longitude,Name,Altitude,Description
-  # 1,37.732511,-119.558805,"Happy Isles Trail Head",0.0,"Happy Isles Trail Head"
-  a = CSV.open(file, 'r', :headers => true).to_a.map { |row| row.to_hash }
-  #          ... http://technicalpickles.com/posts/parsing-csv-with-ruby/
-  # output array of hashes now looks like (represented as JSON):
-  #   [{"No":"1","Latitude":"37.732511","Longitude":"-119.558805","Name":"Happy Isles Trail Head","Altitude":"0.0"...
-  path = []
-  a.each { |h|
-    alt = 0.0
-    if h.has_key?('Altitude') then alt=h['Altitude'].to_f end
-    path.push([h['Latitude'].to_f,h['Longitude'].to_f,alt])
-  }
-  return path
-end
-
-def sanity_check_lat_lon_alt(path)
-  path.each { |p|
-    lat,lon,alt = p
-    if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
-    if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
-    if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
-  }
-end
-
-def get_lat_lon_alt_box(path)
-  lon_lo = 999.9
-  lon_hi = -999.9
-  lat_lo = 999.9
-  lat_hi = -999.9
-  alt_lo = 10000.0
-  alt_hi = -10000.0
-  path.each { |p|
-    lat,lon,alt = p
-    lon_lo=lon if lon < lon_lo
-    lon_hi=lon if lon > lon_hi
-    lat_lo=lat if lat < lat_lo
-    lat_hi=lat if lat > lat_hi
-    alt_lo=alt if alt < alt_lo
-    alt_hi=alt if alt > alt_hi
-  }
-  return [lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
-end
-
-#====================================================================================
-
 get_parameters("#{Dir.home}/.kcals",ARGV)
 
 if $cgi then Dir.chdir("kcals_scratch") end
@@ -275,44 +56,8 @@ if $verbosity>=2 then
   print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
 end
 
-path = []
-format_recognized = false
-
-if $format=='kml' || $format=='gpx' then
-  format_recognized = true
-  kml = $stdin.gets(nil) # slurp all of stdin until end of file
-  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
-  temp_csv = "#{temp}_convert.csv"
-  temp_kml = "#{temp}_convert.#{$format}"
-  $temp_files.push(temp_csv)
-  $temp_files.push(temp_kml)
-  open(temp_kml,'w') { |f| f.print kml }
-  ok,err = shell_out_low_level("gpsbabel -t -i #{$format} -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
-  if !ok then fatal_error("syntax error on KML input; this usually means you specied the wrong format.\n#{err}") end
-  path = import_csv(temp_csv)
-end
-
-if $format=='csv' then
-  format_recognized = true
-  csv = $stdin.gets(nil) # slurp all of stdin until end of file
-  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
-  temp_csv = "#{temp}_convert.csv"
-  $temp_files.push(temp_csv)
-  open(temp_csv,'w') { |f| f.print csv }
-  path = import_csv(temp_csv)
-end
-
-if $format=='text' then
-  format_recognized = true
-  $stdin.each_line { |line|
-    if line=~/\AT\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/ then
-      lat,lon,alt = $1.to_f,$2.to_f,$3.to_f # in degrees, degrees, meters
-      path.push([lat,lon,alt])
-    end
-  }
-end
-
-if !format_recognized then fatal_error("unrecognized format: #{$format}") end
+data = $stdin.gets(nil) # slurp all of stdin until end of file
+path = read_track($format,data)
 
 sanity_check_lat_lon_alt(path)
 lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = get_lat_lon_alt_box(path)
@@ -595,3 +340,293 @@ if !$cgi then
 end
 
 clean_up_temp_files
+
+end
+
+#=========================================================================
+# @@ physiological model
+#=========================================================================
+
+# For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
+
+def minetti(i)
+  if $running then return minetti_cr(i) else return minetti_cw(i) end
+end
+
+def in_minetti_range(i)
+  return -0.5 if i<-0.5
+  return 0.5 if i>0.5
+  return i
+end
+
+def minetti_cr(i)
+  # i = gradient
+  # cr = cost of running, in J/kg.m
+  i = in_minetti_range(i)
+  return 155.4*i**5-30.4*i**4-43.3*i**3+46.3*i**2+19.5*i+3.6
+  # note that the 3.6 is different from their best value of 3.4 on the flats, i.e., the polynomial isn't a perfect fit
+end
+
+def minetti_cw(i)
+  # i = gradient
+  # cr = cost of walking, in J/kg.m
+  i = in_minetti_range(i)
+  return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
+end
+
+#=========================================================================
+# @@ physics, geometry
+#=========================================================================
+
+def earth_radius(lat,lon)
+  # https://en.wikipedia.org/wiki/Earth_radius#Geocentric_radius
+  a = 6378137.0 # earth's equatorial radius, in meters
+  b = 6356752.3 # polar radius
+  slat = Math::sin(deg_to_rad(lat))
+  clat = Math::cos(deg_to_rad(lat))
+  return Math::sqrt( ((a*a*clat)**2+(b*b*slat)**2) / ((a*clat)**2+(b*slat)**2)) # radius in meters
+end
+
+def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
+  # inputs are in degrees, except for alt, which is in meters
+  # The purpose of lat0 and lon0 is to do a rotation to make the cartesian coordinates easier to interpret.
+  # outputs are in meters
+  lat_rad = deg_to_rad(lat)
+  rotate = true # rotate to tangent coordinates?
+  lonx = lon
+  if rotate then lonx=lon-lon0 end
+  lon_rad = deg_to_rad(lonx)
+  slat = Math::sin(lat_rad)
+  slon = Math::sin(lon_rad)
+  clat = Math::cos(lat_rad)
+  clon = Math::cos(lon_rad)
+  r0 = earth_radius(lat0,lon0)
+        # Use initial latitude and keep r0 constant. If we let r0 vary, then we also need to figure
+        # out the direction of the g vector in this model.
+  r = r0+alt
+  x = r*clat*clon
+  y = r*clat*slon
+  z = r*slat
+  xx = x
+  zz = z
+  if rotate then
+    slat0 = Math::sin(deg_to_rad(lat0))
+    clat0 = Math::cos(deg_to_rad(lat0))
+    xx =  clat0*x+slat0*z
+    zz = -slat0*x+clat0*z
+  end
+  return [r,xx,y,zz]
+end
+
+def interpolate_raster(z,x,y)
+  # z = array[iy][ix]
+  # x,y = floating point, in array-index units
+  ix = x.to_i
+  iy = y.to_i
+  fx = x-ix # fractional part
+  fy = y-iy
+  z = interpolate_square(fx,fy,z[iy][ix],z[iy][ix+1],z[iy+1][ix],z[iy+1][ix+1])  
+  return z
+end
+
+#=========================================================================
+# @@ reading input files
+#=========================================================================
+
+def read_track(format,data)
+  if format=='kml' || format=='gpx' then return read_track_through_gpsbabel(format,data) end
+  if format=='csv' then                  return read_track_from_csv(data) end
+  if format=='text' then                 return read_track_from_text(data) end
+  fatal_error("unrecognized format: #{format}")
+end
+
+def read_track_through_gpsbabel(format,kml)
+  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
+  temp_csv = "#{temp}_convert.csv"
+  temp_kml = "#{temp}_convert.#{format}"
+  $temp_files.push(temp_csv)
+  $temp_files.push(temp_kml)
+  open(temp_kml,'w') { |f| f.print kml }
+  ok,err = shell_out_low_level("gpsbabel -t -i #{format} -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
+  if !ok then fatal_error("syntax error on KML input; this usually means you specied the wrong format.\n#{err}") end
+  return import_csv(temp_csv)
+end
+
+def read_track_from_csv(csv)
+  if $cgi then temp = "temp#{Process.pid}" else temp="temp" end
+  temp_csv = "#{temp}_convert.csv"
+  $temp_files.push(temp_csv)
+  open(temp_csv,'w') { |f| f.print csv }
+  return import_csv(temp_csv)
+end
+
+def read_track_from_text(data)
+  path = []
+  data.each_line { |line|
+    if line=~/\AT\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/ then
+      lat,lon,alt = $1.to_f,$2.to_f,$3.to_f # in degrees, degrees, meters
+      path.push([lat,lon,alt])
+    end
+  }
+  return path
+end
+
+# import the unicsv format written by gpsbabel:
+def import_csv(file)
+  # csv file looks like:
+  # No,Latitude,Longitude,Name,Altitude,Description
+  # 1,37.732511,-119.558805,"Happy Isles Trail Head",0.0,"Happy Isles Trail Head"
+  a = CSV.open(file, 'r', :headers => true).to_a.map { |row| row.to_hash }
+  #          ... http://technicalpickles.com/posts/parsing-csv-with-ruby/
+  # output array of hashes now looks like (represented as JSON):
+  #   [{"No":"1","Latitude":"37.732511","Longitude":"-119.558805","Name":"Happy Isles Trail Head","Altitude":"0.0"...
+  path = []
+  a.each { |h|
+    alt = 0.0
+    if h.has_key?('Altitude') then alt=h['Altitude'].to_f end
+    path.push([h['Latitude'].to_f,h['Longitude'].to_f,alt])
+  }
+  return path
+end
+
+def sanity_check_lat_lon_alt(path)
+  path.each { |p|
+    lat,lon,alt = p
+    if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
+    if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
+    if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
+  }
+end
+
+def get_lat_lon_alt_box(path)
+  lon_lo = 999.9
+  lon_hi = -999.9
+  lat_lo = 999.9
+  lat_hi = -999.9
+  alt_lo = 10000.0
+  alt_hi = -10000.0
+  path.each { |p|
+    lat,lon,alt = p
+    lon_lo=lon if lon < lon_lo
+    lon_hi=lon if lon > lon_hi
+    lat_lo=lat if lat < lat_lo
+    lat_hi=lat if lat > lat_hi
+    alt_lo=alt if alt < alt_lo
+    alt_hi=alt if alt > alt_hi
+  }
+  return [lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
+end
+
+#=========================================================================
+# @@ low-level file access, shell, command-line arguments
+#=========================================================================
+
+def clean_up_temp_files
+  shell_out("rm -f #{$temp_files.join(' ')}")
+end
+
+def fatal_error(message)
+  if $verbosity>=1 && !$cgi then
+    $stderr.print "kcals.rb: #{$verb} fatal error: #{message}\n"
+  else
+    print JSON.generate({'error'=>message})+"\n"
+  end
+  exit(-1)
+end
+
+def warning(message)
+  if $verbosity>=1 && !$cgi then
+    $stderr.print "kcals.rb: #{$verb} warning: #{message}\n"
+  else
+    $warnings.push(message)
+  end
+end
+
+def shell_out(c,additional_error_info='')
+  shell_out_low_level(c,additional_error_info,true)
+end
+
+def shell_out_low_level(c,additional_error_info,die_on_error)
+  redir = ''
+  if $cgi then redir='1>/dev/null 2>/dev/null' end
+  ok = system("#{c} #{redir}")
+  return [true,''] if ok
+  message = "error on shell command #{c}, #{$?}\n#{additional_error_info}"
+  if die_on_error then
+    fatal_error(message)
+  else
+    return [false,message]
+  end
+end
+
+def handle_param(s,where)
+  if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
+    par,value = $1,$2
+    recognized = false
+    if par=='metric' then recognized=true; $metric=(value.to_i==1) end
+    if par=='running' then recognized=true; $running=(value.to_i==1) end
+    if par=='weight' then recognized=true; $body_mass=value.to_f end
+    if par=='filtering' then recognized=true; $osc_h=value.to_f end
+    if par=='format' then recognized=true; $format=value end
+    if par=='dem' then recognized=true; $dem=(value.to_i==1) end
+    if par=='verbosity' then recognized=true; $verbosity=value.to_i end
+    if par=='resolution' then recognized=true; $resolution=value.to_f end
+    if par=='force_dem' then recognized=true; $force_dem=(value==1) end
+    if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
+  else
+    fatal_error("illegal syntax#{where}:\n#{s}")
+  end
+end
+
+def get_parameters(prefs_file,command_line_parameters)
+  # first read from prefs file:
+  if !$cgi then
+    prefs = "#{Dir.home}/.kcals"
+    begin
+      open(prefs,'r') { |f|
+        f.each_line {|line|
+          next if line=~/\A\s*\Z/
+          handle_param(line," in #{prefs}")
+        }
+      }
+    rescue
+      warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
+    end
+  end
+  # then override at command line:
+  command_line_parameters.each { |p| handle_param(p,'') }
+end
+
+#=========================================================================
+# @@ low-level math
+#=========================================================================
+
+def deg_to_rad(x)
+  return 0.0174532925199433*x
+end
+
+def pythag(x,y)
+  return Math::sqrt(x*x+y*y)
+end
+
+def interpolate_square(x,y,z00,z10,z01,z11)
+  root2 = Math::sqrt(2.0)
+  w00 = (root2-pythag(x,y)).abs
+  w10 = (root2-pythag(x-1.0,y)).abs
+  w01 = (root2-pythag(x,y-1.0)).abs
+  w11 = (root2-pythag(x-1.0,y-1.0)).abs
+  norm = w00+w10+w01+w11
+  z = (z00*w00+z10*w10+z01*w01+z11*w11)/norm
+  return z
+end
+
+def linear_interp(x1,x2,s)
+  return x1+s*(x2-x1)
+end
+
+
+#=========================================================================
+# @@ execute main()
+#=========================================================================
+
+main
