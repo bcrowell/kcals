@@ -108,7 +108,7 @@ $weight = 66.0
 if cgi.has_key?('metric') && cgi['metric']=='1' then $metric=1 end
 if cgi.has_key?('running') && cgi['running']=='0' then $running=0 end
 if cgi.has_key?('format') then
-  if cgi['format']=='text' then $format='text' end
+  if cgi['format']=='txt' then $format='txt' end
   if cgi['format']=='csv' then $format='csv' end
 end
 if cgi.has_key?('weight') then $weight=cgi['weight'].to_f end

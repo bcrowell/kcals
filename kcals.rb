@@ -16,7 +16,7 @@ def main
 
   init_globals
   command_line_params = ARGV
-  input_file = get_parameters("#{Dir.home}/.kcals",command_line_params)
+  input_file = get_parameters(command_line_params)
   if $cgi then Dir.chdir("kcals_scratch") end
   path = get_track(input_file) # may have side-effect of creating temp files in cwd
 
@@ -683,7 +683,7 @@ def handle_param(s,where)
   end
 end
 
-def get_parameters(prefs_file,command_line_parameters)
+def get_parameters(command_line_parameters)
   # as a side-effect, manipulates the globals that hold the parameters: $body_mass, etc.
   # looks for defaults in prefs file
   # returns name of input file, or nil if reading from stdin
