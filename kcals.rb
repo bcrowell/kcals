@@ -14,37 +14,30 @@ require 'csv' # standard ruby library
 
 def main
 
-init_globals
-command_line_params = ARGV
-input_file = get_parameters("#{Dir.home}/.kcals",command_line_params)
-if $cgi then Dir.chdir("kcals_scratch") end
-path = get_track(input_file) # may have side-effect of creating temp files in cwd
+  init_globals
+  command_line_params = ARGV
+  input_file = get_parameters("#{Dir.home}/.kcals",command_line_params)
+  if $cgi then Dir.chdir("kcals_scratch") end
+  path = get_track(input_file) # may have side-effect of creating temp files in cwd
 
-sanity_check_lat_lon_alt(path)
-box = get_lat_lon_alt_box(path)
-lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
+  sanity_check_lat_lon_alt(path)
+  box = get_lat_lon_alt_box(path) # box=[lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
 
-path = add_resolution_and_check_size_limit(path,box)
-path = add_dem_or_warn_if_appropriate(path,box)
+  path = add_resolution_and_check_size_limit(path,box)
+  path = add_dem_or_warn_if_appropriate(path,box)
+  cartesian = to_cartesian(path)
 
-cartesian = to_cartesian(path)
-if !$cgi then make_path_csv(path,cartesian) end
+  hv = integrate_horiz_and_vert(cartesian)
+    # list of [horiz,vert] positions
+  hv = filter_elevation(hv) # get rid of bogus fluctations
+  h = hv.last[0]
+  c,d,gain = integrate_gain_and_energy(hv)
 
-n = cartesian.length
+  if !$cgi then make_path_csv(path,cartesian) end
+  if !$cgi then make_profile_csv(hv) end
+  print_stats(h,d,gain,c)
 
-hv = integrate_horiz_and_vert(cartesian)
-  # list of [horiz,vert] positions
-hv = filter_elevation(hv) # get rid of bogus fluctations
-
-h = hv.last[0]
-
-c,d,gain = integrate_gain_and_energy(hv)
-
-if !$cgi then make_profile_csv(hv) end
-
-print_stats(h,d,gain,c)
-
-clean_up_temp_files
+  clean_up_temp_files
 
 end
 
