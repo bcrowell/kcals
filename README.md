@@ -28,7 +28,9 @@ synopsis:
 
 `kcals.rb <route.kml` ... read parameters from preferences file
 
-`kcals.rb format=text filtering=600 weight=58 <route.txt` ... override parameters from command line
+`kcals.rb format=txt filtering=600 weight=58 <route.txt` ... override parameters from command line
+
+`kcals.rb filtering=600 weight=58 route.txt` ... final parameter interpreted as input file, format inferred
 
 The input formats that are supported are KML and the text format
 written by gpsvisualizer.com.  Writes total stats to stdout. Also

@@ -14,12 +14,6 @@ require 'csv' # standard ruby library
 
 def main
 
-if $stdin.isatty then
-  print "This program reads a track from standard input in a format such as KML. For documentation, see\n"
-  print "https://github.com/bcrowell/kcals\n"
-  exit(-1)
-end
-
 $cgi = ENV.has_key?("CGI")
 
 $metric = false
@@ -48,15 +42,17 @@ $warned_big_delta = false
 
 $temp_files = []
 
-get_parameters("#{Dir.home}/.kcals",ARGV)
+command_line_params = ARGV
+input_file = get_parameters("#{Dir.home}/.kcals",command_line_params)
 
 if $cgi then Dir.chdir("kcals_scratch") end
 
-if $verbosity>=2 then
-  print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+if input_file.nil?
+  if $stdin.isatty then fatal_error("This program reads a track from standard input in a format such as KML. For documentation, see https://github.com/bcrowell/kcals") end
+  data = $stdin.gets(nil) # slurp all of stdin until end of file
+else
+  data = slurp_file(input_file)
 end
-
-data = $stdin.gets(nil) # slurp all of stdin until end of file
 path = read_track($format,data)
 
 sanity_check_lat_lon_alt(path)
@@ -319,6 +315,9 @@ else
   gain = gain*3.28084
 end
 kcals = c*0.000239006
+if $verbosity>=2 then
+  print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+end
 if $verbosity>0 then
   print "horizontal distance = #{"%.2f" % [h]} #{h_unit}\n"
   print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
@@ -436,7 +435,7 @@ end
 def read_track(format,data)
   if format=='kml' || format=='gpx' then return read_track_through_gpsbabel(format,data) end
   if format=='csv' then                  return read_track_from_csv(data) end
-  if format=='text' then                 return read_track_from_text(data) end
+  if format=='txt' then                  return read_track_from_text(data) end
   fatal_error("unrecognized format: #{format}")
 end
 
@@ -521,6 +520,25 @@ end
 # @@ low-level file access, shell, command-line arguments
 #=========================================================================
 
+# returns contents or nil on error; for more detailed error reporting, see slurp_file_with_detailed_error_reporting()
+def slurp_file(file)
+  x = slurp_file_with_detailed_error_reporting(file)
+  return x[0]
+end
+
+# returns [contents,nil] normally [nil,error message] otherwise
+def slurp_file_with_detailed_error_reporting(file)
+  begin
+    File.open(file,'r') { |f|
+      t = f.gets(nil) # nil means read whole file
+      if t.nil? then t='' end # gets returns nil at EOF, which means it returns nil if file is empty
+      return [t,nil]
+    }
+  rescue
+    return [nil,"Error opening file #{file} for input: #{$!}."]
+  end
+end
+
 def clean_up_temp_files
   shell_out("rm -f #{$temp_files.join(' ')}")
 end
@@ -560,6 +578,7 @@ def shell_out_low_level(c,additional_error_info,die_on_error)
 end
 
 def handle_param(s,where)
+  explicit_format = false
   if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
     par,value = $1,$2
     recognized = false
@@ -567,18 +586,31 @@ def handle_param(s,where)
     if par=='running' then recognized=true; $running=(value.to_i==1) end
     if par=='weight' then recognized=true; $body_mass=value.to_f end
     if par=='filtering' then recognized=true; $osc_h=value.to_f end
-    if par=='format' then recognized=true; $format=value end
     if par=='dem' then recognized=true; $dem=(value.to_i==1) end
     if par=='verbosity' then recognized=true; $verbosity=value.to_i end
     if par=='resolution' then recognized=true; $resolution=value.to_f end
     if par=='force_dem' then recognized=true; $force_dem=(value==1) end
+    if par=='format' then
+      recognized=true
+      $format=value
+      explicit_format = true
+    end
     if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
+    return explicit_format
   else
     fatal_error("illegal syntax#{where}:\n#{s}")
   end
 end
 
 def get_parameters(prefs_file,command_line_parameters)
+  # as a side-effect, manipulates the globals that hold the parameters: $body_mass, etc.
+  # looks for defaults in prefs file
+  # returns name of input file, or nil if reading from stdin
+  input_file = nil # reading from stdin by default
+  if command_line_parameters.length>=1 && !(command_line_parameters.last=~/\=/) then
+    # If the final command-line argument doesn't have an equals sign in it, interpret it as the input file.
+    input_file = command_line_parameters.pop
+  end
   # first read from prefs file:
   if !$cgi then
     prefs = "#{Dir.home}/.kcals"
@@ -594,7 +626,18 @@ def get_parameters(prefs_file,command_line_parameters)
     end
   end
   # then override at command line:
-  command_line_parameters.each { |p| handle_param(p,'') }
+  explicit_format = false
+  command_line_parameters.each { |p|
+    explicit_format = explicit_format | handle_param(p,'') 
+  }
+  if !explicit_format && !input_file.nil? then
+    # attempt to guess format from name of input file
+    if input_file=~/\.(\w+)\Z/ then
+      ext = $1
+      if ext=='csv' || ext=='kml' || ext=='gpx' || ext=='txt' then $format=ext end
+    end
+  end
+  return input_file
 end
 
 #=========================================================================
