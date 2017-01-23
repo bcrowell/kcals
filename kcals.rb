@@ -14,9 +14,6 @@ if $stdin.isatty then
   exit(-1)
 end
 
-
-command_line_parameters=ARGV
-
 $cgi = ENV.has_key?("CGI")
 
 $metric = false
@@ -41,6 +38,9 @@ $server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI vers
 $server_max_points = 2000 # and max number of points
 
 $warnings = []
+$warned_big_delta = false
+
+$temp_files = []
 
 def clean_up_temp_files
   shell_out("rm -f #{$temp_files.join(' ')}")
@@ -80,10 +80,6 @@ def shell_out_low_level(c,additional_error_info,die_on_error)
   end
 end
 
-$warned_big_delta = false
-
-$temp_files = []
-
 def handle_param(s,where)
   if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
     par,value = $1,$2
@@ -103,27 +99,23 @@ def handle_param(s,where)
   end
 end
 
-# first read from prefs file:
-if !$cgi then
-  prefs = "#{Dir.home}/.kcals"
-  begin
-    open(prefs,'r') { |f|
-      f.each_line {|line|
-        next if line=~/\A\s*\Z/
-        handle_param(line," in #{prefs}")
+def get_parameters(prefs_file,command_line_parameters)
+  # first read from prefs file:
+  if !$cgi then
+    prefs = "#{Dir.home}/.kcals"
+    begin
+      open(prefs,'r') { |f|
+        f.each_line {|line|
+          next if line=~/\A\s*\Z/
+          handle_param(line," in #{prefs}")
+        }
       }
-    }
-  rescue
-    warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
+    rescue
+      warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
+    end
   end
-end
-# then override at command line:
-command_line_parameters.each { |p| handle_param(p,'') }
-
-if $cgi then Dir.chdir("kcals_scratch") end
-
-if $verbosity>=2 then
-  print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+  # then override at command line:
+  command_line_parameters.each { |p| handle_param(p,'') }
 end
 
 # For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
@@ -212,6 +204,10 @@ def interpolate_square(x,y,z00,z10,z01,z11)
   return z
 end
 
+def linear_interp(x1,x2,s)
+  return x1+s*(x2-x1)
+end
+
 def interpolate_raster(z,x,y)
   # z = array[iy][ix]
   # x,y = floating point, in array-index units
@@ -239,6 +235,44 @@ def import_csv(file)
     path.push([h['Latitude'].to_f,h['Longitude'].to_f,alt])
   }
   return path
+end
+
+def sanity_check_lat_lon_alt(path)
+  path.each { |p|
+    lat,lon,alt = p
+    if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
+    if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
+    if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
+  }
+end
+
+def get_lat_lon_alt_box(path)
+  lon_lo = 999.9
+  lon_hi = -999.9
+  lat_lo = 999.9
+  lat_hi = -999.9
+  alt_lo = 10000.0
+  alt_hi = -10000.0
+  path.each { |p|
+    lat,lon,alt = p
+    lon_lo=lon if lon < lon_lo
+    lon_hi=lon if lon > lon_hi
+    lat_lo=lat if lat < lat_lo
+    lat_hi=lat if lat > lat_hi
+    alt_lo=alt if alt < alt_lo
+    alt_hi=alt if alt > alt_hi
+  }
+  return [lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
+end
+
+#====================================================================================
+
+get_parameters("#{Dir.home}/.kcals",ARGV)
+
+if $cgi then Dir.chdir("kcals_scratch") end
+
+if $verbosity>=2 then
+  print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
 end
 
 path = []
@@ -280,40 +314,8 @@ end
 
 if !format_recognized then fatal_error("unrecognized format: #{$format}") end
 
-def sanity_check_lat_lon_alt(path)
-  path.each { |p|
-    lat,lon,alt = p
-    if lat<-90 || lat>90 then fatal_error("illegal latitude, #{lat}, in input") end
-    if lon<-360 || lon>360 then fatal_error("illegal longitude, #{lon}, in input") end
-    if alt<-10000.0 || alt>10000.0 then fatal_error("illegal altitude, #{alt}, in input") end
-  }
-end
-
-def get_lat_lon_alt_box(path)
-  lon_lo = 999.9
-  lon_hi = -999.9
-  lat_lo = 999.9
-  lat_hi = -999.9
-  alt_lo = 10000.0
-  alt_hi = -10000.0
-  path.each { |p|
-    lat,lon,alt = p
-    lon_lo=lon if lon < lon_lo
-    lon_hi=lon if lon > lon_hi
-    lat_lo=lat if lat < lat_lo
-    lat_hi=lat if lat > lat_hi
-    alt_lo=alt if alt < alt_lo
-    alt_hi=alt if alt > alt_hi
-  }
-  return [lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
-end
-
 sanity_check_lat_lon_alt(path)
 lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = get_lat_lon_alt_box(path)
-
-def linear_interp(x1,x2,s)
-  return x1+s*(x2-x1)
-end
 
 # For purposes of a couple of estimates, we don't need super accurate horizontal distances.
 # Just use these scale factors.
