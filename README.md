@@ -90,10 +90,11 @@ Parameters are:
 
 ## Filtering
 
-Filtering is a parameter with units of meters that defaults to 500, meant to get rid of bogus
-oscillations in the height data, which are often present both
+The parameters filtering and xy_filtering
+have units of meters and defaults values of 250 and 30. These meant to get rid of bogus
+oscillations in the data, which are often present both
 in GPS tracks and in elevation profiles derived from digital elevation model (DEM) databases such as SRTM.
-To turn off this filtering, set filtering=0.
+To turn off this filtering, set the relevant parameter to 0.
 
 When using DEM data without filtering, I have found 
 noticeable unrealistic wiggles when I graph
@@ -103,11 +104,12 @@ effect on the calorie expenditure output is actually fairly small.
 With GPS tracks, filtering seems to greatly improve precision. For instance, I downloaded three different tracks
 that people had posted online for a popular mountain loop in LA (Mount Baldy via Devil's Backbone, descending
 via the Ski Hut trail). Without filtering, the total gain was estimated to be 5340, 4434, and 4716 feet
-based on the three different tracks. With filtering, the estimates were in much better agreement:
+based on the three different tracks. With filtering=500, the estimates were in much better agreement:
 3792, 3853, and 3849 feet.
 
 The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
-
+Higher resolution increases the mileage, because small wiggles get counted in. This has a big effect on
+the energy calculation, because the energy is mostly sensitive to mileage, not gain.
 
 ## Adding elevation data
 

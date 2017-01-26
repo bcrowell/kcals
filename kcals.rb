@@ -18,7 +18,9 @@ def main
   command_line_params = ARGV
   input_file = get_parameters(command_line_params)
   if $cgi then Dir.chdir("kcals_scratch") end
-  path = get_track(input_file) # may have side-effect of creating temp files in cwd
+  path = get_track(input_file)
+    # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
+    # may have side-effect of creating temp files in cwd
 
   sanity_check_lat_lon_alt(path)
   box = get_lat_lon_alt_box(path) # box=[lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
@@ -26,10 +28,19 @@ def main
   path = add_resolution_and_check_size_limit(path,box)
   path = add_dem_or_warn_if_appropriate(path,box)
   cartesian = to_cartesian(path)
+    # cartesian = array of [r,x,y,z]
 
   hv = integrate_horiz_and_vert(cartesian)
     # list of [horiz,vert] positions
-  hv = filter_elevation(hv) # get rid of bogus fluctations
+  if $method==0 then
+    hv = filter_elevation(hv) # get rid of bogus fluctations
+  else
+    # new, fancier and more efficient filtering
+    r = filter_xyz(hv,cartesian,path)
+    hv = r['hv']
+    path = r['path']
+    cartesian = r['cartesian']
+  end
   h = hv.last[0]
   c,d,gain = integrate_gain_and_energy(hv)
 
@@ -95,7 +106,7 @@ def init_globals
   $metric = false
   $running = true # set to false for walking
   $body_mass = 66 # in kg, =145 lb
-  $osc_h = 500 # typical wavelength, in meters, of bogus oscillations in height data
+  $osc_h = 250 # typical wavelength, in meters, of bogus oscillations in height data
               # calculated gain is very sensitive to this
               # putting in this value, which I estimated by eye from a graph, seems to reproduce
               # mapmyrun's figure for total gain
@@ -109,6 +120,8 @@ def init_globals
                    # than (approximately) this value, in meters. Default of 30 meters is SRTM's resolution.
   $force_dem = false # download DEM data even if elevations are present in the input file, for the reason
                      # described above in the comment describing $resolution
+  $xy_filter = 30.0 # meters
+  $method = 1 # 1 means new filtering method
 
   $server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
   $server_max_points = 2000 # and max number of points
@@ -121,17 +134,23 @@ def init_globals
 end
 
 def make_path_csv(path,cartesian)
+
   path_csv = "lat,lon,alt,x,y,z\n"
   i = 0
+  z0 = cartesian[0][3] # initial point is (0,0,r); subtract this z0 to make it more readable
   path.each { |p|
     lat,lon,alt = p # in degrees, degrees, meters
     cart = cartesian[i]
-    path_csv = path_csv + "#{lat},#{lon},#{alt},#{cart[0]},#{cart[1]},#{cart[2]}\n"
+    path_csv = path_csv + "#{lat},#{lon},#{alt},#{fmt_cart(cart[1])},#{fmt_cart(cart[2])},#{fmt_cart(cart[3]-z0)}\n"
     i = i+1
   }
   File.open('path.csv','w') { |f| 
     f.print path_csv
   }
+end
+
+def fmt_cart(x) # x is a coordinate in meters; format for spreadsheet output
+  return "%.2f" % [x]
 end
 
 def make_profile_csv(hv)
@@ -235,6 +254,118 @@ end
 # @@ filtering of tracks
 #=========================================================================
 
+def filter_xyz(hv0,cartesian0,path0)
+  # hv = list of [horiz,vert] positions
+  # cartesian = array of [r,x,y,z]
+  # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
+  res = 10 # meters; do an initial interpolation so that all points are this far apart in terms of the h
+          # variable calculated from the initial iteration; make this small because fft is efficient,
+          # and we don't want funky artifacts just because we have to make evenly spaced points for fft.
+          # This should be much smaller than $resolution.
+  x = [] # x as a function of h, with even spacing
+  y = []
+  z = []
+  h = hv0.last[0] # total horizontal distance, which we take as our independent variable
+  n = (h/res).to_i+1
+  # make n a power of 2
+  n = 2**(Math.log2(h/res).floor)
+  if n<(h/res).to_i || n<2 then n=n*2 end
+  dh = h/n
+  n0 = hv0.length
+  j=0
+  0.upto(n-1) { |i|
+    h = i*dh
+    h1 = h2 = nil
+    loop do # if the point we want doesn't lie in the current segment, bump it up
+      h1 = hv0[j][0]
+      h2 = hv0[j+1][0]
+      break if h2>=h || j>=n0-2
+      j=j+1
+    end
+    if h2==h1 then s=0 else s=(h-h1)/(h2-h1) end
+    x.push(linear_interp(cartesian0[j][1],cartesian0[j+1][1],s))
+    y.push(linear_interp(cartesian0[j][2],cartesian0[j+1][2],s))
+    z.push(linear_interp(cartesian0[j][3],cartesian0[j+1][3],s))
+  }
+  xy_window = ($xy_filter/dh).floor 
+  x = do_filter(x,xy_window)
+  y = do_filter(y,xy_window)
+  z = do_filter(z,($osc_h/dh).floor)
+  cartesian = []
+  path = []
+  lat0 = path0[0][0]
+  lon0 = path0[0][1]
+  alt0 = path0[0][2]
+  0.upto(n-1) { |i|
+    xx,yy,zz = x[i],y[i],z[i]
+    r = Math::sqrt(xx*xx+yy*yy+zz*zz)
+    cartesian[i] = [r,xx,yy,zz]
+    # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
+    path[i] = cartesian_to_spherical(xx,yy,zz,lat0,lon0,alt0)
+  }
+  hv = integrate_horiz_and_vert(cartesian)
+  return {'hv'=>hv,'cartesian'=>cartesian,'path'=>path}
+end
+
+def do_filter(v0,w)
+  if w<=1 then return v0 end
+  # v0's length should be a power of 2 and >=2
+  # w = width of rectangular window to convolve with
+  # returns a fresh array, doesn't modify v0
+  # remove DC and detrend, so that start and end are both at 0
+  #        -- https://www.dsprelated.com/showthread/comp.dsp/175408-1.php
+  # v0 = original, which we don't touch
+  # v = detrended
+  # v1 = filtered
+  # For the current method, it's only necessary that n is even, not a power of 2, and detrending
+  # isn't actually needed.
+  v = v0.dup
+  n = v.length
+  slope = (v.last-v[0])/(n.to_f-1.0)
+  c = -v[0]
+  0.upto(n-1) { |i|
+    v[i] = v[i] - (c + slope*i)
+  }
+  # convolve with a rectangle of width w:
+  v1 = []
+  sum = 0
+  count = 0
+  # initial portion where part of the rectangle is off the left end:
+  0.upto(w-1) { |i|
+    break if i>n/2-1 # this happens in the unusual case where w isn't less than n; we're guaranteed that n is even
+    sum = sum+v[i]
+    count = count+1
+    v1[i] = sum/count
+  }
+  sum_left = sum
+  # final portion
+  sum = 0
+  count = 0
+  0.upto(w-1) { |i|
+    k = n-1-i
+    break if k<n/2
+    sum = sum+v[k]
+    count = count+1
+    v1[k] = sum/count
+  }
+  # middle portion; this is the normal case:
+  if w<n then
+    sum = sum_left
+    w.upto(n-w) { |i|
+      sum = sum + v[i]-v[i-w]
+      v1[i] = sum/w
+    }
+  end
+  # put DC and trend back in:
+  0.upto(n-1) { |i|
+    v1[i] = v1[i] + (c + slope*i)
+  }
+  #0.upto(n-1) { |i|
+  #  if (v1[i]-v0[i]).abs>10.0 then print "i=#{i}, diff=#{v1[i]-v0[i]}\n"; exit(-1) end
+  #}
+  return v1
+end
+
 def filter_elevation(hv)
   # hv = list of [horiz,vert] positions
   # filtering to get rid of artifacts of bad digital elevation model, which have a big effect
@@ -297,7 +428,7 @@ def add_resolution_and_check_size_limit(path,box)
 
   # For purposes of a couple of estimates, we don't need super accurate horizontal distances.
   # Just use these scale factors.
-  r = earth_radius(lat_lo,lon_lo) # just need a rough estimate
+  r = earth_radius(lat_lo) # just need a rough estimate
   klat = (Math::PI/180.0)*r # meters per degree of latitude
   klon = klat*Math::cos(deg_to_rad(lat_lo)) # ... and longitude
 
@@ -458,7 +589,7 @@ end
 # @@ physics, geometry
 #=========================================================================
 
-def earth_radius(lat,lon)
+def earth_radius(lat)
   # https://en.wikipedia.org/wiki/Earth_radius#Geocentric_radius
   a = 6378137.0 # earth's equatorial radius, in meters
   b = 6356752.3 # polar radius
@@ -467,35 +598,49 @@ def earth_radius(lat,lon)
   return Math::sqrt( ((a*a*clat)**2+(b*b*slat)**2) / ((a*clat)**2+(b*slat)**2)) # radius in meters
 end
 
+def cartesian_to_spherical(x,yy,zz,lat0,lon0,alt0)
+  # returns [lat,lon,altitude], in units of degrees, degrees, and meters
+  # see spherical_to_cartesian() for description of coordinate systems used and the transformations.
+  r0 = earth_radius(lat0)
+  slat0 = Math::sin(deg_to_rad(lat0))
+  clat0 = Math::cos(deg_to_rad(lat0))
+  r = Math::sqrt(x*x+yy*yy+zz*zz)
+  alt = r-r0
+  y =  clat0*yy+slat0*zz
+  z = -slat0*yy+clat0*zz
+  lat = rad_to_deg(Math::asin(y/r))
+  lon = rad_to_deg(Math::atan2(x,z))+lon0
+  return [lat,lon,alt]
+end
+
 def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   # inputs are in degrees, except for alt, which is in meters
   # The purpose of lat0 and lon0 is to do a rotation to make the cartesian coordinates easier to interpret.
-  # outputs are in meters
+  # outputs are in meters. We rotate to coordinate axes parallel to NSEWUD at initial point.
+  # x=east, y=north, z=up
+  # The z coordinate is always almost exactly equal to the radius of the earth.
   lat_rad = deg_to_rad(lat)
-  rotate = true # rotate to tangent coordinates?
-  lonx = lon
-  if rotate then lonx=lon-lon0 end
-  lon_rad = deg_to_rad(lonx)
+  lon_rad=deg_to_rad(lon-lon0)
   slat = Math::sin(lat_rad)
   slon = Math::sin(lon_rad)
   clat = Math::cos(lat_rad)
   clon = Math::cos(lon_rad)
-  r0 = earth_radius(lat0,lon0)
+  r0 = earth_radius(lat0)
         # Use initial latitude and keep r0 constant. If we let r0 vary, then we also need to figure
         # out the direction of the g vector in this model.
   r = r0+alt
-  x = r*clat*clon
-  y = r*clat*slon
-  z = r*slat
-  xx = x
-  zz = z
-  if rotate then
-    slat0 = Math::sin(deg_to_rad(lat0))
-    clat0 = Math::cos(deg_to_rad(lat0))
-    xx =  clat0*x+slat0*z
-    zz = -slat0*x+clat0*z
-  end
-  return [r,xx,y,zz]
+  # Initially calculate it in coordinate axes where z points from earth's center to the point P on equator
+  # nearest to the start, x points east from P (which we pretend is at lon=0), and y points toward
+  # celestial pole.
+  z = r*clat*clon
+  x = r*clat*slon
+  y = r*slat
+  # Now rotate in the yz plane to get in coordinates parallel to NSEWUD at initial point.
+  slat0 = Math::sin(deg_to_rad(lat0))
+  clat0 = Math::cos(deg_to_rad(lat0))
+  yy =  clat0*y-slat0*z
+  zz =  slat0*y+clat0*z
+  return [r,x,yy,zz]
 end
 
 def interpolate_raster(z,x,y)
@@ -667,10 +812,12 @@ def handle_param(s,where)
     if par=='running' then recognized=true; $running=(value.to_i==1) end
     if par=='weight' then recognized=true; $body_mass=value.to_f end
     if par=='filtering' then recognized=true; $osc_h=value.to_f end
+    if par=='xy_filtering' then recognized=true; $xy_filter=value.to_f end
     if par=='dem' then recognized=true; $dem=(value.to_i==1) end
     if par=='verbosity' then recognized=true; $verbosity=value.to_i end
     if par=='resolution' then recognized=true; $resolution=value.to_f end
     if par=='force_dem' then recognized=true; $force_dem=(value==1) end
+    if par=='method' then recognized=true; $method=value.to_i end # for testing; take this out at some point
     if par=='format' then
       recognized=true
       $format=value
@@ -727,6 +874,10 @@ end
 
 def deg_to_rad(x)
   return 0.0174532925199433*x
+end
+
+def rad_to_deg(x)
+  return x/0.0174532925199433
 end
 
 def pythag(x,y)
