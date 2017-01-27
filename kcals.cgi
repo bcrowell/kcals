@@ -3,6 +3,7 @@
 require 'cgi'
 require 'tempfile'
 require 'json'
+require 'open3'
 
 $home_url = "http://lightandmatter.com/kcals"
 
@@ -118,12 +119,30 @@ begin
   print "<h1>Kcals</h1>\n"
   infile << cgi_file.read # copy CGI upload data into temp file, which we will then read back
   infile.close
-  c = "CGI=1 ./kcals.rb verbosity=0 dem=1 metric=#{$metric} running=#{$running} format=#{$format} weight=#{$weight} <#{infile.path}"
-  print "<!-- #{c} -->\n" # for debugging purposes
-  json = `#{c}`
-  print "<!-- #{json} -->\n" # for debugging purposes
-  results = JSON.parse(json)
-  print format_output(results)
+  args = {'verbosity'=>0,'dem'=>1,'metric'=>$metric,'running'=>$running,'format'=>$format,'weight'=>$weight,
+          'infile'=>infile.path}
+  args_json = JSON.generate(args)
+
+  env = ENV.to_hash
+  env['CGI'] = '1'
+  env['PATH'] = env['PATH']+":"+Dir.pwd
+  stdin, stdout, stderr, wait_thr = Open3.popen3(env,'kcals.rb',args_json)
+  results_json = stdout.gets(nil)
+  stdout.close
+  error_output = stderr.gets(nil)
+  stderr.close
+  exit_code = wait_thr.value
+
+  # comments, for debugging purposes:
+  print "<!-- #{args_json} -->\n"
+  print "<!-- #{results_json} -->\n"
+  print "<!-- error_output=#{error_output} -->\n"
+  print "<!-- exit_code=#{exit_code} -->\n"
+
+  if !results_json.nil? then
+    results = JSON.parse(results_json)
+    print format_output(results)
+  end
 ensure
   # The following is supposed to happen automatically, but is good practice to do explicitly.
   print html_bottom

@@ -14,9 +14,11 @@ require 'csv' # standard ruby library
 
 def main
 
+  $cgi = ENV.has_key?("CGI")
+
   init_globals
   command_line_params = ARGV
-  input_file = get_parameters(command_line_params)
+  input_file = get_parameters($cgi,command_line_params)
   if $cgi then Dir.chdir("kcals_scratch") end
   path = get_track(input_file)
     # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
@@ -673,7 +675,7 @@ def read_track_through_gpsbabel(format,kml)
   $temp_files.push(temp_kml)
   open(temp_kml,'w') { |f| f.print kml }
   ok,err = shell_out_low_level("gpsbabel -t -i #{format} -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
-  if !ok then fatal_error("syntax error on KML input; this usually means you specied the wrong format.\n#{err}") end
+  if !ok then fatal_error("syntax error on KML input; this usually means you specified the wrong format.\n#{err}") end
   return import_csv(temp_csv)
 end
 
@@ -766,7 +768,7 @@ def slurp_file_with_detailed_error_reporting(file)
 end
 
 def clean_up_temp_files
-  shell_out("rm -f #{$temp_files.join(' ')}")
+  shell_out("rm -f #{$temp_files.join(' ')}") if $temp_files.length>0
 end
 
 def fatal_error(message)
@@ -793,9 +795,10 @@ end
 def shell_out_low_level(c,additional_error_info,die_on_error)
   redir = ''
   if $cgi then redir='1>/dev/null 2>/dev/null' end
-  ok = system("#{c} #{redir}")
+  full_command = "#{c} #{redir}"
+  ok = system(full_command)
   return [true,''] if ok
-  message = "error on shell command #{c}, #{$?}\n#{additional_error_info}"
+  message = "error on shell command #{full_command}, #{$?}\n#{additional_error_info}"
   if die_on_error then
     fatal_error(message)
   else
@@ -803,55 +806,67 @@ def shell_out_low_level(c,additional_error_info,die_on_error)
   end
 end
 
+def set_param(par,value,where,s)
+  recognized = false
+  if par=='metric' then recognized=true; $metric=(value.to_i==1) end
+  if par=='running' then recognized=true; $running=(value.to_i==1) end
+  if par=='weight' then recognized=true; $body_mass=value.to_f end
+  if par=='filtering' then recognized=true; $osc_h=value.to_f end
+  if par=='dem' then recognized=true; $dem=(value.to_i==1) end
+  if par=='verbosity' then recognized=true; $verbosity=value.to_i end
+  if par=='resolution' then recognized=true; $resolution=value.to_f end
+  if par=='force_dem' then recognized=true; $force_dem=(value==1) end
+  if par=='infile' then recognized=true; $infile=value end
+  if par=='format' then
+    recognized=true
+    $format=value
+    explicit_format = true
+  end
+  if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
+end
+
 def handle_param(s,where)
   explicit_format = false
   if s=~/\A\s*(\w+)\s*=\s*([^\s]+)\Z/ then
     par,value = $1,$2
-    recognized = false
-    if par=='metric' then recognized=true; $metric=(value.to_i==1) end
-    if par=='running' then recognized=true; $running=(value.to_i==1) end
-    if par=='weight' then recognized=true; $body_mass=value.to_f end
-    if par=='filtering' then recognized=true; $osc_h=value.to_f end
-    if par=='xy_filtering' then recognized=true; $xy_filter=value.to_f end
-    if par=='dem' then recognized=true; $dem=(value.to_i==1) end
-    if par=='verbosity' then recognized=true; $verbosity=value.to_i end
-    if par=='resolution' then recognized=true; $resolution=value.to_f end
-    if par=='force_dem' then recognized=true; $force_dem=(value==1) end
-    if par=='method' then recognized=true; $method=value.to_i end # for testing; take this out at some point
-    if par=='format' then
-      recognized=true
-      $format=value
-      explicit_format = true
-    end
-    if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
+    explicit_format = set_param(par,value,where,s)
     return explicit_format
   else
     fatal_error("illegal syntax#{where}:\n#{s}")
   end
 end
 
-def get_parameters(command_line_parameters)
+def get_parameters(cgi,command_line_parameters)
+  # cgi = boolean, are we running as a CGI?
   # as a side-effect, manipulates the globals that hold the parameters: $body_mass, etc.
   # looks for defaults in prefs file
   # returns name of input file, or nil if reading from stdin
+
+  # If running as CGI, then for security we just take all the arguments from a JSON string passed through popen2.
+  # One of the parameters should be infile.
+  if cgi then
+    params = JSON.parse(command_line_parameters[0])
+    params.each_key {|par| set_param(par,params[par],'','')}
+    return $infile
+  end
+
+  # Not running as CGI...
   input_file = nil # reading from stdin by default
   if command_line_parameters.length>=1 && !(command_line_parameters.last=~/\=/) then
     # If the final command-line argument doesn't have an equals sign in it, interpret it as the input file.
     input_file = command_line_parameters.pop
   end
   # first read from prefs file:
-  if !$cgi then
-    prefs = "#{Dir.home}/.kcals"
-    begin
-      open(prefs,'r') { |f|
-        f.each_line {|line|
-          next if line=~/\A\s*\Z/
-          handle_param(line," in #{prefs}")
-        }
+  prefs = "#{Dir.home}/.kcals"
+  begin
+    open(prefs,'r') { |f|
+      f.each_line {|line|
+        next if line=~/\A\s*\Z/
+        handle_param(line," in #{prefs}")
       }
-    rescue
-      warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
-    end
+    }
+  rescue
+    warning("Warning: File #{prefs} doesn't exist, so default values have been assumed for all parameters.")
   end
   # then override at command line:
   explicit_format = false
