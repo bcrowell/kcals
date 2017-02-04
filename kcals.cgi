@@ -90,7 +90,7 @@ def format_output(r)
       </tr>
       <tr>
         <td>CF (fraction of effort due to climbing)</td>
-        <td>#{r['cf']} %</td>
+        <td>#{r['cf']*100.0} %</td>
       </tr>
     </table>
 TABLE
