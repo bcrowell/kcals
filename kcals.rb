@@ -34,21 +34,20 @@ def main
 
   hv = integrate_horiz_and_vert(cartesian)
     # list of [horiz,vert] positions
-  if $method==0 then
-    hv = filter_elevation(hv) # get rid of bogus fluctations
-  else
-    # new, fancier and more efficient filtering
-    r = filter_xyz(hv,cartesian,path)
-    hv = r['hv']
-    path = r['path']
-    cartesian = r['cartesian']
-  end
-  h = hv.last[0]
-  c,d,gain = integrate_gain_and_energy(hv)
 
-  if !$cgi then make_path_csv(path,cartesian) end
+  # get rid of bogus fluctations
+  r = filter_xyz(hv,cartesian,path)
+  hv = r['hv']
+  path = r['path']
+  cartesian = r['cartesian']
+
+  h = hv.last[0]
+  stats = integrate_gain_and_energy(hv)
+  stats['h'] = h
+
+  if !$cgi then make_path_csv_and_json(path,cartesian,box) end
   if !$cgi then make_profile_csv(hv) end
-  print_stats(h,d,gain,c)
+  print_stats(stats)
 
   clean_up_temp_files
 
@@ -58,7 +57,9 @@ end
 # @@ helper routines for main
 #=========================================================================
 
-def print_stats(h,d,gain,c)
+def print_stats(stats)
+  h,c,d,gain,i_rms,e_q = stats['h'],stats['c'],stats['d'],stats['gain'],stats['i_rms'],stats['e_q']
+  iota_mean,iota_rms,cf = stats['iota_mean'],stats['iota_rms'],stats['cf']
   if $metric then
     h_unit = "km"
     v_unit = "m"
@@ -72,6 +73,7 @@ def print_stats(h,d,gain,c)
     gain = gain*3.28084
   end
   kcals = c*0.000239006
+  eq_kcals = e_q*0.000239006
   if $verbosity>=2 then
     print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
   end
@@ -80,11 +82,19 @@ def print_stats(h,d,gain,c)
     print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
     print "gain = #{"%.0f" % [gain]} #{v_unit}\n"
     print "cost = #{"%.0f" % [kcals]} kcals\n"
+    print "i_rms = #{"%.4f" % [i_rms]}\n"
+    print "E_q = #{"%.0f" % [eq_kcals]} kcals\n"
+    print "iota_mean = #{"%.4f" % [iota_mean]}\n"
+    print "iota_sd = #{"%.4f" % [iota_rms]}\n"
+    print "CF (fraction of effort due to climbing) = #{"%4.f" % [cf*100.0]}\n"
   else
-    print JSON.generate({'horiz'=>("%.2f" % [h]),'horiz_unit'=>h_unit,
+    print JSON.generate({
+                   'horiz'=>("%.2f" % [h]),          'horiz_unit'=>h_unit,
                    'slope_distance'=>("%.2f" % [d]),
-                   'gain'=>("%.0f" % [gain]),'vert_unit'=>v_unit,
+                   'gain'=>("%.0f" % [gain]),        'vert_unit'=>v_unit,
                    'cost'=>("%.0f" % [kcals]),
+                   'i_rms'=>("%.4f" % [i_rms]),
+                   'cf'=>("%4.2f" % [cf]),
                    'warnings'=>$warnings
              })+"\n"
   end
@@ -135,20 +145,29 @@ def init_globals
 
 end
 
-def make_path_csv(path,cartesian)
+def make_path_csv_and_json(path,cartesian,box)
+
+  lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi = box
 
   path_csv = "lat,lon,alt,x,y,z\n"
   i = 0
   z0 = cartesian[0][3] # initial point is (0,0,r); subtract this z0 to make it more readable
+  path_data = []
   path.each { |p|
     lat,lon,alt = p # in degrees, degrees, meters
     cart = cartesian[i]
-    path_csv = path_csv + "#{lat},#{lon},#{alt},#{fmt_cart(cart[1])},#{fmt_cart(cart[2])},#{fmt_cart(cart[3]-z0)}\n"
+    x,y,z = [fmt_cart(cart[1]),fmt_cart(cart[2]),fmt_cart(cart[3]-z0)]
+    path_csv = path_csv + "#{lat},#{lon},#{alt},#{x},#{y},#{z}\n"
+    path_data.push([lat,lon,alt,x.to_f,y.to_f,z.to_f])
     i = i+1
   }
   File.open('path.csv','w') { |f| 
     f.print path_csv
   }
+  File.open('path.json','w') { |f| 
+    f.print JSON.generate({'box'=>box,'r'=>earth_radius(lat_lo),'z0'=>z0,'path'=>path_data})
+  }
+
 end
 
 def fmt_cart(x) # x is a coordinate in meters; format for spreadsheet output
@@ -156,7 +175,7 @@ def fmt_cart(x) # x is a coordinate in meters; format for spreadsheet output
 end
 
 def make_profile_csv(hv)
-  csv = "horizontal,vertical,dh,dv\n"
+  csv = "horizontal,vertical,dh,dv,i,iota\n"
   first = true
   old_h = 0
   old_v = 0
@@ -165,11 +184,15 @@ def make_profile_csv(hv)
     if !first then
       dh = h-old_h
       dv = v-old_v
+      i = dv/dh
     else
       dh = 0.0
       dv = 0.0
+      i=0.0
     end
-    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]}\n"
+    i = in_minetti_range(i) # sanity check, don't contaminate results with bogus stuff
+    iota = i_to_iota(i)
+    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]}\n"
     old_h = h
     old_v = v
     first = false
@@ -185,7 +208,7 @@ end
 
 def integrate_gain_and_energy(hv)
   # integrate to find total gain, slope distance, and energy burned
-  h = 0 # total horizontal distance
+  # returns {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,...}
   v = 0 # total vertical distance (=0 at end of a loop)
   d = 0 # total distance along the slope
   gain = 0 # total gain
@@ -193,6 +216,10 @@ def integrate_gain_and_energy(hv)
   first = true
   old_h = 0
   old_v = 0
+  i_sum = 0.0
+  i_sum_sq = 0.0
+  iota_sum = 0.0
+  iota_sum_sq = 0.0
   hv.each { |a|
     h,v = a
     if !first then
@@ -203,6 +230,13 @@ def integrate_gain_and_energy(hv)
       if dv>0 then gain=gain+dv end
       i=0
       if dh>0 then i=dv/dh end
+      if i>1.0 then i=1.0 end # sanity check, sometimes we get large bogus values that would mess up stats
+      if i<-1.0 then i=-1.0 end # ...
+      i_sum = i_sum + i
+      i_sum_sq = i_sum_sq + i*i
+      iota = i_to_iota(i)
+      iota_sum = iota_sum + iota
+      iota_sum_sq = iota_sum_sq + iota*iota
       c = c+dd*$body_mass*minetti(i)
            # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
     end
@@ -210,7 +244,17 @@ def integrate_gain_and_energy(hv)
     old_v = v
     first = false
   }
-  return [c,d,gain]
+  n = hv.length-1.0
+  i_rms = i_sum_sq/n - (i_sum/n)**2
+  iota_mean = iota_sum/n
+  iota_rms = iota_sum_sq/n - (iota_sum/n)**2
+  h = hv.last[0]-hv[0][0]
+  i_mean = (hv.last[1]-hv[0][1])/h
+  i0,c0,c2,b0,b1,b2 = minetti_quadratic_coeffs()
+  e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
+  cf = (c-h*$body_mass*minetti(0.0))/c
+  return {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
+           'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf}
 end
 
 def integrate_horiz_and_vert(cartesian)
@@ -312,10 +356,14 @@ end
 def do_filter(v0,w)
   if w<=1 then return v0 end
   # v0's length should be a power of 2 and >=2
-  # w = width of rectangular window to convolve with
+  # w = width of rectangular window to convolve with; will be made even if it isn't
   # returns a fresh array, doesn't modify v0
+
+  if w%2==1 then w=w+1 end
+
   # remove DC and detrend, so that start and end are both at 0
   #        -- https://www.dsprelated.com/showthread/comp.dsp/175408-1.php
+  # After filtering, we put these back in.
   # v0 = original, which we don't touch
   # v = detrended
   # v1 = filtered
@@ -328,43 +376,59 @@ def do_filter(v0,w)
   0.upto(n-1) { |i|
     v[i] = v[i] - (c + slope*i)
   }
+
+  # Copy the unfiltered data over as a default. On the initial and final portions, where part of the
+  # rectangular kernel hangs over the end, we don't attempt to do any filtering. Using the filter
+  # on those portions, even with appropriate normalization, would bias the (x,y) points, effectively
+  # moving the start and finish line inward.
+  v1 = v.dup
+
   # convolve with a rectangle of width w:
-  v1 = []
   sum = 0
   count = 0
-  # initial portion where part of the rectangle is off the left end:
+  # Sum the initial portion for use in the average for the first filtered data point:
+  sum_left = 0.0
   0.upto(w-1) { |i|
     break if i>n/2-1 # this happens in the unusual case where w isn't less than n; we're guaranteed that n is even
-    sum = sum+v[i]
-    count = count+1
-    v1[i] = sum/count
+    sum_left = sum_left+v[i]
   }
-  sum_left = sum
-  # final portion
-  sum = 0
-  count = 0
-  0.upto(w-1) { |i|
-    k = n-1-i
-    break if k<n/2
-    sum = sum+v[k]
-    count = count+1
-    v1[k] = sum/count
-  }
-  # middle portion; this is the normal case:
+  # the filter is applied to the middle portion, from w to n-w:
   if w<n then
     sum = sum_left
-    w.upto(n-w) { |i|
+    w.upto(n) { |i|
       sum = sum + v[i]-v[i-w]
-      v1[i] = sum/w
+      j = i-w/2
+      break if j>n-w
+      if j>=w && j<=n-w then
+        v1[j] = sum/w
+      end
     }
   end
+
+  # To avoid a huge discontinuity in the elevation when the filter turns on, turn it on gradually
+  # in the initial and final segments of length w:
+  # FIXME: leaves a small discontinuity
+  sum_left = 0.0
+  sum_right = 0.0
+  nn = 0
+  0.upto(2*w+1) { |i|
+    break if i>n/2-1 # unusual case, see above
+    j = n-i-1
+    sum_left = sum_left+v[i]
+    sum_right = sum_right+v[j]
+    nn = nn+1
+    if i%2==0 then
+      ii = i/2
+      jj = n-i/2-1
+      v1[ii] = sum_left/nn
+      v1[jj] = sum_right/nn
+    end
+  }
+
   # put DC and trend back in:
   0.upto(n-1) { |i|
     v1[i] = v1[i] + (c + slope*i)
   }
-  #0.upto(n-1) { |i|
-  #  if (v1[i]-v0[i]).abs>10.0 then print "i=#{i}, diff=#{v1[i]-v0[i]}\n"; exit(-1) end
-  #}
   return v1
 end
 
@@ -564,6 +628,45 @@ end
 
 def minetti(i)
   if $running then return minetti_cr(i) else return minetti_cw(i) end
+end
+
+def i_to_iota(i)
+  # convert i to a linearized scale iota, where iota^2=[C(i)-C(imin)]/c2 and sign(iota)=sign(i-imin)
+  # The following are the minima of the Minetti functions.
+  if $running then
+    imin = -0.181355
+    cmin = 1.781269
+    c2=66.0
+  else
+    imin = -0.152526
+    cmin= 0.935493
+    c2=94.0
+  end
+  c=minetti(i) # automatically brings i in sane range if out of range
+  if c<cmin then 
+    # warning("c=#{c}, cmin=#{cmin}, i=#{i}, imin=#{imin}, running=#{$running}") 
+    # happens sometimes due to rounding
+    c=cmin
+  end
+  result = Math::sqrt((c-cmin)/c2)
+  if i<imin then result= -result end
+  return result
+end
+
+def minetti_quadratic_coeffs() # my rough approximation to Minetti, optimized to fit the range that's most common
+  if $running then
+    i0=-0.15
+    c0=1.84
+    c2=66.0
+  else
+    i0=-0.1
+    c0=1.13
+    c2=94.0
+  end
+  b0=c0+c2*i0*i0
+  b1=-2*c2*i0
+  b2=c2
+  return [i0,c0,c2,b0,b1,b2]
 end
 
 def in_minetti_range(i)
@@ -812,6 +915,7 @@ def set_param(par,value,where,s)
   if par=='running' then recognized=true; $running=(value.to_i==1) end
   if par=='weight' then recognized=true; $body_mass=value.to_f end
   if par=='filtering' then recognized=true; $osc_h=value.to_f end
+  if par=='xy_filtering' then recognized=true; $xy_filter=value.to_f end
   if par=='dem' then recognized=true; $dem=(value.to_i==1) end
   if par=='verbosity' then recognized=true; $verbosity=value.to_i end
   if par=='resolution' then recognized=true; $resolution=value.to_f end

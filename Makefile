@@ -20,3 +20,8 @@ update-cgi:
 clean-cgi:
 	rm -Rf /usr/lib/cgi-bin/kcals_scratch
 	rm -Rf /var/www/kcals
+
+foo:
+	./kcals.rb dem=1 filtering=0 xy_filtering=0 gps_tracks/baldy_001.csv && ./make_svg.rb && mv path.svg b1.svg
+	./kcals.rb dem=1 filtering=0 xy_filtering=0 gps_tracks/baldy_002.csv && ./make_svg.rb && mv path.svg b2.svg
+	./kcals.rb dem=1 filtering=0 xy_filtering=0 gps_tracks/baldy_003.csv && ./make_svg.rb && mv path.svg b3.svg

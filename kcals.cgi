@@ -88,6 +88,10 @@ def format_output(r)
         <td>energy expended</td>
         <td>#{r['cost']} kcals</td>
       </tr>
+      <tr>
+        <td>CF (fraction of effort due to climbing)</td>
+        <td>#{r['cf']} %</td>
+      </tr>
     </table>
 TABLE
   print about_method()
