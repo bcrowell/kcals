@@ -27,6 +27,8 @@ def main
   sanity_check_lat_lon_alt(path)
   box = get_lat_lon_alt_box(path) # box=[lat_lo,lat_hi,lon_lo,lon_hi,alt_lo,alt_hi]
 
+  orig_n = path.length
+
   path = add_resolution_and_check_size_limit(path,box)
   path = add_dem_or_warn_if_appropriate(path,box)
   cartesian = to_cartesian(path)
@@ -44,6 +46,8 @@ def main
   h = hv.last[0]
   stats = integrate_gain_and_energy(hv)
   stats['h'] = h
+  stats['orig_n'] = orig_n
+  stats['orig_resolution'] = h/orig_n
 
   if !$cgi then make_path_csv_and_json(path,cartesian,box) end
   if !$cgi then make_profile_csv(hv) end
@@ -60,6 +64,8 @@ end
 def print_stats(stats)
   h,c,d,gain,i_rms,e_q = stats['h'],stats['c'],stats['d'],stats['gain'],stats['i_rms'],stats['e_q']
   iota_mean,iota_rms,cf = stats['iota_mean'],stats['iota_rms'],stats['cf']
+  orig_n,orig_resolution,baumel_si = stats['orig_n'],stats['orig_resolution'],stats['baumel_si']
+  h_raw = h
   if $metric then
     h_unit = "km"
     v_unit = "m"
@@ -82,11 +88,16 @@ def print_stats(stats)
     print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
     print "gain = #{"%.0f" % [gain]} #{v_unit}\n"
     print "cost = #{"%.0f" % [kcals]} kcals\n"
-    print "i_rms = #{"%.4f" % [i_rms]}\n"
-    print "E_q = #{"%.0f" % [eq_kcals]} kcals\n"
-    print "iota_mean = #{"%.4f" % [iota_mean]}\n"
-    print "iota_sd = #{"%.4f" % [iota_rms]}\n"
-    print "CF (fraction of effort due to climbing) = #{"%4.f" % [cf*100.0]}\n"
+    print "CF (fraction of effort due to climbing) = #{"%4.f" % [cf*100.0]} %\n"
+    if $verbosity>=3 then
+      print "i_rms = #{"%.4f" % [i_rms]}\n"
+      print "baumel_si = #{baumel_si} m\n"
+      print "E_q = #{"%.0f" % [eq_kcals]} kcals\n"
+      print "iota_mean = #{"%.4f" % [iota_mean]}\n"
+      print "iota_sd = #{"%.4f" % [iota_rms]}\n"
+      print "orig_n = #{orig_n}\n"
+      print "resolution ~ orig_n/distance = #{"%.2f" % [orig_resolution]} m\n"
+    end
   else
     print JSON.generate({
                    'horiz'=>("%.2f" % [h]),          'horiz_unit'=>h_unit,
@@ -124,8 +135,9 @@ def init_globals
               # mapmyrun's figure for total gain
   $format = 'kml' # see README.md for legal values
   $dem = false # attempt to download DEM if absent from input?
-  $verbosity = 2 # can go from 0 to 3; 0 means just to output data for use by a script
-                 # at level 3, when we shell out, stderr and stdout get displayed
+  $verbosity = 2 # can go from 0 to 4; 0 means just to output data for use by a script
+                 # at level 3, we get extra stats printed out
+                 # at level 4, when we shell out, stderr and stdout get displayed
                  # level 0 means just output some json for use by a script
   $resolution = 30 # The path may contain long pieces that look like straight lines on a map, but are actually
                    # jagged in terms of elevation profile. Interpolate the polyline to make segments no longer
@@ -220,6 +232,7 @@ def integrate_gain_and_energy(hv)
   i_sum_sq = 0.0
   iota_sum = 0.0
   iota_sum_sq = 0.0
+  baumel_si = 0.0 # compute this directly as a check
   hv.each { |a|
     h,v = a
     if !first then
@@ -230,13 +243,16 @@ def integrate_gain_and_energy(hv)
       if dv>0 then gain=gain+dv end
       i=0
       if dh>0 then i=dv/dh end
+      if dh>0 then baumel_si=baumel_si+dv**2/dh end
       if i>1.0 then i=1.0 end # sanity check, sometimes we get large bogus values that would mess up stats
       if i<-1.0 then i=-1.0 end # ...
-      i_sum = i_sum + i
-      i_sum_sq = i_sum_sq + i*i
+      # In the following, weight by dh, although normally this doesn't matter because we make the
+      # h intervals constant before this point.
+      i_sum = i_sum + i*dh
+      i_sum_sq = i_sum_sq + i*i*dh
       iota = i_to_iota(i)
-      iota_sum = iota_sum + iota
-      iota_sum_sq = iota_sum_sq + iota*iota
+      iota_sum = iota_sum + iota*dh
+      iota_sum_sq = iota_sum_sq + iota*iota*dh
       c = c+dd*$body_mass*minetti(i)
            # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
     end
@@ -245,16 +261,16 @@ def integrate_gain_and_energy(hv)
     first = false
   }
   n = hv.length-1.0
-  i_rms = i_sum_sq/n - (i_sum/n)**2
-  iota_mean = iota_sum/n
-  iota_rms = iota_sum_sq/n - (iota_sum/n)**2
   h = hv.last[0]-hv[0][0]
+  i_rms = Math::sqrt(i_sum_sq/h - (i_sum/h)**2)
+  iota_mean = iota_sum/h
+  iota_rms = Math::sqrt(iota_sum_sq/h - (iota_sum/h)**2)
   i_mean = (hv.last[1]-hv[0][1])/h
   i0,c0,c2,b0,b1,b2 = minetti_quadratic_coeffs()
   e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
   cf = (c-h*$body_mass*minetti(0.0))/c
   return {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
-           'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf}
+           'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf,'baumel_si'=>baumel_si}
 end
 
 def integrate_horiz_and_vert(cartesian)
@@ -503,6 +519,9 @@ def add_resolution_and_check_size_limit(path,box)
   if h_diag>$server_max && $cgi then
     fatal_error("Sorry, your route covers too large a region for the server-based application.")
   end
+  if h_diag>300000.0 then # more than 300 km
+    fatal_error("Something is wrong, the diagonal measurement across the bounding box of your route appears to be #{h_diag/1000.0} km, which is unreasonably large.")
+  end
 
   path2 = []
   i=0
@@ -549,7 +568,7 @@ def add_dem(path,box)
   box = "#{lon_lo} #{lat_lo} #{lon_hi} #{lat_hi}"
   if $verbosity>=2 then $stderr.print "Downloading elevation data.\n" end
   redir = "1>#{temp_stdout} 2>#{temp_stderr}";
-  if $verbosity>=3 then redir='' end
+  if $verbosity>=4 then redir='' end
   cache_dir_option = ''
   if $cgi then # in command-line use, these get marked for deletion below, only after running the commands, so possible
                # error information is preserved
