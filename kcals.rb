@@ -129,10 +129,8 @@ def init_globals
   $metric = false
   $running = true # set to false for walking
   $body_mass = 66 # in kg, =145 lb
-  $osc_h = 250 # typical wavelength, in meters, of bogus oscillations in height data
-              # calculated gain is very sensitive to this
-              # putting in this value, which I estimated by eye from a graph, seems to reproduce
-              # mapmyrun's figure for total gain
+  $osc_h = 200.0 # Filter out variations in elevation that occur on horizontal scales shorter than this
+                 # value, in meters. Calculated gain is very sensitive to this.
   $format = 'kml' # see README.md for legal values
   $dem = false # attempt to download DEM if absent from input?
   $verbosity = 2 # can go from 0 to 4; 0 means just to output data for use by a script
@@ -493,6 +491,9 @@ def add_dem_or_warn_if_appropriate(path,box)
   no_alt = alt_lo==0.0 && alt_hi==0.0
   if no_alt && !$dem then
     warning("The input file does not appear to contain any elevation data. Turn on the option 'dem' to try to download this.")
+  end
+  if !no_alt && !$force_dem then
+    warning("The input file contains elevation data, but force_dem is 0. This is likely to produce inaccurate results. For better results, set force_dem to 1.")
   end
   if $force_dem || (no_alt && $dem) then
     path = add_dem(path,box)
@@ -938,7 +939,7 @@ def set_param(par,value,where,s)
   if par=='dem' then recognized=true; $dem=(value.to_i==1) end
   if par=='verbosity' then recognized=true; $verbosity=value.to_i end
   if par=='resolution' then recognized=true; $resolution=value.to_f end
-  if par=='force_dem' then recognized=true; $force_dem=(value==1) end
+  if par=='force_dem' then recognized=true; $force_dem=(value.to_i==1) end
   if par=='infile' then recognized=true; $infile=value end
   if par=='format' then
     recognized=true

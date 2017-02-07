@@ -90,22 +90,33 @@ Parameters are:
 
 ## Filtering
 
-The parameters filtering and xy_filtering
-have units of meters and defaults values of 250 and 30. These meant to get rid of bogus
-oscillations in the data, which are often present both
-in GPS tracks and in elevation profiles derived from digital elevation model (DEM) databases such as SRTM.
-To turn off this filtering, set the relevant parameter to 0.
+The parameters filtering and xy_filtering both represent horizontal distances
+in units of meters. Their defaults values are 200 and 30, respectively. These are meant to get rid of bogus
+oscillations in the data. Any elevation (z) changes that occur over horizontal distances less
+than the value of "filtering" will tend to get filtered out, and likewise any horizontal motion that occurs
+over horizontal distances less than the value of "xy_filtering."
+To turn off filtering, set the relevant parameter to 0. 
 
-When using DEM data without filtering, I have found 
-noticeable unrealistic wiggles when I graph
-the elevation profile using the CSV output file, and the total gain was wildly wrong. However, the
-effect on the calorie expenditure output is actually fairly small.
+The choice of the vertical filtering parameter
+can have a huge effect on the total elevation gain, but the
+effect on the calorie expenditure is usually fairly small.
+There are several reasons why it may be a good idea to set a fairly large value of the vertical
+("filtering") parameter:
 
-With GPS tracks, filtering seems to greatly improve precision. For instance, I downloaded three different tracks
-that people had posted online for a popular mountain loop in LA (Mount Baldy via Devil's Backbone, descending
-via the Ski Hut trail). Without filtering, the total gain was estimated to be 5340, 4434, and 4716 feet
-based on the three different tracks. With filtering=500, the estimates were in much better agreement:
-3792, 3853, and 3849 feet.
+ 1. If the resolution of the horizontal track is poor, then it may appear to go up and down steep hillsides,
+          when in fact the real road or trail contours around them.
+
+ 2. If elevations from GPS are being used (which is a bad idea), then random fluctuations in the GPS
+          elevations can cause large errors.
+
+ 3. If the elevations are being taken from a digital elevation model (DEM), which is generally a good
+         idea, then there may still be certain types of errors.
+         Trails and roads are intentionally constructed so as not to go up and down steep hills. For instance,
+         a road may cut straight through a hillside or even go through a tunnel, but this sort of information
+         will not be present in the DEM. Or a road next to a big, steep hillside may show up on the DEM
+         as having a incorrect, high elevation, because the resolution of the DEM (about 30 m for the one
+         used by this software) is such that the hillside's elevation gets averaged in to the elevation
+         of the road below.
 
 The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
 Higher resolution increases the mileage, because small wiggles get counted in. This has a big effect on
@@ -113,7 +124,7 @@ the energy calculation, because the energy is mostly sensitive to mileage, not g
 
 ## Adding elevation data
 
-Many applications, such as mapmyrun, output GPS tracks in KML format but set all the altitude data to
+Many applications, such as mapmyrun, output tracks in KML format but set all the altitude data to
 zero. To get around this, there are two options:
 
 (1) Run the KML file through the filter at
