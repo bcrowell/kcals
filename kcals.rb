@@ -19,6 +19,9 @@ def main
   init_globals
   command_line_params = ARGV
   input_file = get_parameters($cgi,command_line_params)
+
+  if $test then test; exit(0) end
+
   if $cgi then Dir.chdir("kcals_scratch") end
   path = get_track(input_file)
     # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
@@ -32,16 +35,17 @@ def main
   path = add_resolution_and_check_size_limit(path,box)
   path = add_dem_or_warn_if_appropriate(path,box)
   cartesian = to_cartesian(path)
-    # cartesian = array of [r,x,y,z]
+    # cartesian = array of [x,y,z]
 
   hv = integrate_horiz_and_vert(cartesian)
     # list of [horiz,vert] positions
 
-  # get rid of bogus fluctations
-  r = filter_xyz(hv,cartesian,path)
-  hv = r['hv']
-  path = r['path']
-  cartesian = r['cartesian']
+  if $xy_filter>0.0 && $osc_h>0.0 then
+    r = filter_xyz(hv,cartesian,path)
+    hv = r['hv']
+    path = r['path']
+    cartesian = r['cartesian']
+  end
 
   h = hv.last[0]
   stats = integrate_gain_and_energy(hv)
@@ -161,12 +165,11 @@ def make_path_csv_and_json(path,cartesian,box)
 
   path_csv = "lat,lon,alt,x,y,z\n"
   i = 0
-  z0 = cartesian[0][3] # initial point is (0,0,r); subtract this z0 to make it more readable
   path_data = []
   path.each { |p|
     lat,lon,alt = p # in degrees, degrees, meters
     cart = cartesian[i]
-    x,y,z = [fmt_cart(cart[1]),fmt_cart(cart[2]),fmt_cart(cart[3]-z0)]
+    x,y,z = [fmt_cart(cart[0]),fmt_cart(cart[1]),fmt_cart(cart[2])]
     path_csv = path_csv + "#{lat},#{lon},#{alt},#{x},#{y},#{z}\n"
     path_data.push([lat,lon,alt,x.to_f,y.to_f,z.to_f])
     i = i+1
@@ -175,7 +178,7 @@ def make_path_csv_and_json(path,cartesian,box)
     f.print path_csv
   }
   File.open('path.json','w') { |f| 
-    f.print JSON.generate({'box'=>box,'r'=>earth_radius(lat_lo),'z0'=>z0,'path'=>path_data})
+    f.print JSON.generate({'box'=>box,'r'=>earth_radius(lat_lo),'path'=>path_data})
   }
 
 end
@@ -284,13 +287,13 @@ def integrate_horiz_and_vert(cartesian)
   h=0
   v=0
   cartesian.each { |p|
-    r,x2,y2,z2 = p
+    x2,y2,z2 = p
     if first then 
       first=false
     else
       dx,dy,dz=x2-x,y2-y,z2-z
       dl2 = dx*dx+dy*dy+dz*dz
-      dv = (dx*x+dy*y+dz*z)/r # dot product of dr with rhat = vertical distance
+      dv = dz
       q = dl2-dv*dv
       if q>=0.0 then dh = Math::sqrt(q) else dh=0.0 end # horizontal distance
       h = h+dh
@@ -316,7 +319,7 @@ end
 
 def filter_xyz(hv0,cartesian0,path0)
   # hv = list of [horiz,vert] positions
-  # cartesian = array of [r,x,y,z]
+  # cartesian = array of [x,y,z]
   # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
   res = 10 # meters; do an initial interpolation so that all points are this far apart in terms of the h
           # variable calculated from the initial iteration; make this small because fft is efficient,
@@ -343,9 +346,9 @@ def filter_xyz(hv0,cartesian0,path0)
       j=j+1
     end
     if h2==h1 then s=0 else s=(h-h1)/(h2-h1) end
-    x.push(linear_interp(cartesian0[j][1],cartesian0[j+1][1],s))
-    y.push(linear_interp(cartesian0[j][2],cartesian0[j+1][2],s))
-    z.push(linear_interp(cartesian0[j][3],cartesian0[j+1][3],s))
+    x.push(linear_interp(cartesian0[j][0],cartesian0[j+1][0],s))
+    y.push(linear_interp(cartesian0[j][1],cartesian0[j+1][1],s))
+    z.push(linear_interp(cartesian0[j][2],cartesian0[j+1][2],s))
   }
   xy_window = ($xy_filter/dh).floor 
   x = do_filter(x,xy_window)
@@ -358,10 +361,9 @@ def filter_xyz(hv0,cartesian0,path0)
   alt0 = path0[0][2]
   0.upto(n-1) { |i|
     xx,yy,zz = x[i],y[i],z[i]
-    r = Math::sqrt(xx*xx+yy*yy+zz*zz)
-    cartesian[i] = [r,xx,yy,zz]
+    cartesian[i] = [xx,yy,zz]
     # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
-    path[i] = cartesian_to_spherical(xx,yy,zz,lat0,lon0,alt0)
+    path[i] = cartesian_to_spherical(xx,yy,zz,lat0,lon0)
   }
   hv = integrate_horiz_and_vert(cartesian)
   return {'hv'=>hv,'cartesian'=>cartesian,'path'=>path}
@@ -471,7 +473,7 @@ def filter_elevation(hv)
 end
 
 def to_cartesian(path)
-  cartesian = [] # array of [r,x,y,z]
+  cartesian = [] # array of [x,y,z]
   first = true
   lat0 = 0
   lon0 = 0
@@ -479,6 +481,9 @@ def to_cartesian(path)
     lat,lon,alt = p # in degrees, degrees, meters
     if first then lat0=lat; lon0=lon end
           # ... for convenience of visualization and interp, and also to fix radius of earth at initial value
+    unless $lat0.nil? then lat0=$lat0 end
+    unless $lon0.nil? then lon0=$lon0 end
+    unless $alt0.nil? then alt0=$alt0 end
     cart = spherical_to_cartesian(lat,lon,alt,lat0,lon0)
     cartesian.push(cart)
     first=false
@@ -723,49 +728,65 @@ def earth_radius(lat)
   return Math::sqrt( ((a*a*clat)**2+(b*b*slat)**2) / ((a*clat)**2+(b*slat)**2)) # radius in meters
 end
 
-def cartesian_to_spherical(x,yy,zz,lat0,lon0,alt0)
+def cartesian_to_spherical(x,yy,z,lat0,lon0)
   # returns [lat,lon,altitude], in units of degrees, degrees, and meters
   # see spherical_to_cartesian() for description of coordinate systems used and the transformations.
+  # Calculate a first-order approximation to the inverse of the polyconic projection:
   r0 = earth_radius(lat0)
+  zz = z+r0
   slat0 = Math::sin(deg_to_rad(lat0))
   clat0 = Math::cos(deg_to_rad(lat0))
   r = Math::sqrt(x*x+yy*yy+zz*zz)
-  alt = r-r0
   y =  clat0*yy+slat0*zz
-  z = -slat0*yy+clat0*zz
+  zzz = -slat0*yy+clat0*zz
   lat = rad_to_deg(Math::asin(y/r))
-  lon = rad_to_deg(Math::atan2(x,z))+lon0
-  return [lat,lon,alt]
+  lon = rad_to_deg(Math::atan2(x,zzz))+lon0
+  1.upto(10) { |i| # more iterations to improve the result
+    x2,y2,z2 = spherical_to_cartesian(lat,lon,z,lat0,lon0)
+    dx = x-x2
+    dy = yy-y2
+    break if dx.abs<1.0e-8 and dy.abs<1.0e-8
+    lat = lat + rad_to_deg(dy/r0)
+    lon = lon + rad_to_deg(dx/(r0*clat0)) if clat0!=0.0
+  }
+  return [lat,lon,z]
 end
 
 def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
-  # inputs are in degrees, except for alt, which is in meters
+  # Inputs are in degrees, except for alt, which is in meters.
+  # The "cartesian" coordinates are not actually cartesian. They're coordinates in which
+  # (x,y) are from a polyconic projection https://en.wikipedia.org/wiki/Polyconic_projection
+  # centered on (lat0,lon0), and z is altitude.
+  # (In older versions of the software, z was distance from center of earth.)
+  # Outputs are in meters. The metric for the projection is not exactly euclidean, so later
+  # calculations that treat these as cartesian coordinates are making an approximation. The error
+  # should be tiny on the scales we normally deal with. The important thing for our purposes is
+  # that the gradient of z is vertical.
   # The purpose of lat0 and lon0 is to do a rotation to make the cartesian coordinates easier to interpret.
   # outputs are in meters. We rotate to coordinate axes parallel to NSEWUD at initial point.
-  # x=east, y=north, z=up
-  # The z coordinate is always almost exactly equal to the radius of the earth.
-  lat_rad = deg_to_rad(lat)
-  lon_rad=deg_to_rad(lon-lon0)
-  slat = Math::sin(lat_rad)
-  slon = Math::sin(lon_rad)
-  clat = Math::cos(lat_rad)
-  clon = Math::cos(lon_rad)
+  # The notation in the following is the notation from the WP article.
+  lam = deg_to_rad(lon)
+  lam0 = deg_to_rad(lon0)
+  phi = deg_to_rad(lat)
+  phi0 = deg_to_rad(lat0)
+  cotphi = 1/Math::tan(phi)
+  u = (lam-lam0)*Math::sin(phi) # is typically on the order of 10^-3 (half the width of a USGS topo)
+  if u.abs<0.01
+    # use taylor series to avoid excessive rounding in calculation of 1-cos(u)
+    u2 = u*u
+    u4 = u2*u2
+    one_minus_cosu = 0.5*u2-(0.0416666666666667)*u4+(1.38888888888889e-3)*u2*u4-(2.48015873015873e-5)*u4*u4
+      # max error is about 10^-27, which is a relative error of about 10^-23
+  else
+    one_minus_cosu = 1-Math::cos(u)
+  end
   r0 = earth_radius(lat0)
         # Use initial latitude and keep r0 constant. If we let r0 vary, then we also need to figure
         # out the direction of the g vector in this model.
-  r = r0+alt
-  # Initially calculate it in coordinate axes where z points from earth's center to the point P on equator
-  # nearest to the start, x points east from P (which we pretend is at lon=0), and y points toward
-  # celestial pole.
-  z = r*clat*clon
-  x = r*clat*slon
-  y = r*slat
-  # Now rotate in the yz plane to get in coordinates parallel to NSEWUD at initial point.
-  slat0 = Math::sin(deg_to_rad(lat0))
-  clat0 = Math::cos(deg_to_rad(lat0))
-  yy =  clat0*y-slat0*z
-  zz =  slat0*y+clat0*z
-  return [r,x,yy,zz]
+  x = r0*cotphi*Math::sin(u)
+  y = r0*((phi-phi0)+cotphi*one_minus_cosu)
+  z = alt
+  return [x,y,z]
 end
 
 def interpolate_raster(z,x,y)
@@ -936,11 +957,15 @@ def set_param(par,value,where,s)
   if par=='weight' then recognized=true; $body_mass=value.to_f end
   if par=='filtering' then recognized=true; $osc_h=value.to_f end
   if par=='xy_filtering' then recognized=true; $xy_filter=value.to_f end
+  if par=='lat0' then recognized=true; $lat0=value.to_f end
+  if par=='lon0' then recognized=true; $lon0=value.to_f end
+  if par=='alt0' then recognized=true; $alt0=value.to_f end
   if par=='dem' then recognized=true; $dem=(value.to_i==1) end
   if par=='verbosity' then recognized=true; $verbosity=value.to_i end
   if par=='resolution' then recognized=true; $resolution=value.to_f end
   if par=='force_dem' then recognized=true; $force_dem=(value.to_i==1) end
   if par=='infile' then recognized=true; $infile=value end
+  if par=='test' then recognized=true; $test=value end
   if par=='format' then
     recognized=true
     $format=value
@@ -1038,6 +1063,25 @@ def linear_interp(x1,x2,s)
   return x1+s*(x2-x1)
 end
 
+
+#=========================================================================
+# @@ testing
+#=========================================================================
+
+# to run this test, execute the software with test=1
+def test
+  # manker flat
+  lat=34.266225
+  lon=-117.626925
+  alt=1884.138
+  # offset by a tenth of a degree, which is on the order of the width of a USGS topo
+  lat0=34.1
+  lon0=-117.5
+  print "lat=#{lat} lon=#{lon} alt=#{alt}\n"
+  r,x,y,z = spherical_to_cartesian(lat,lon,alt,lat0,lon0)
+  latx,lonx,altx = cartesian_to_spherical(x,y,z,lat0,lon0)
+  print "lat2=#{latx} lon2=#{lonx} alt2=#{altx}\n"
+end
 
 #=========================================================================
 # @@ execute main()
