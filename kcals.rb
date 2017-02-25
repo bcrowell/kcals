@@ -25,7 +25,7 @@ def main
 
   if $test then test; exit(0) end
 
-  if $cgi then Dir.chdir("kcals_scratch") end
+  if $cgi then Dir.chdir("scratch") end
   path = get_track(input_file)
     # path = array of [lat,lon,altitude], in units of degrees, degrees, and meters
     # may have side-effect of creating temp files in cwd
