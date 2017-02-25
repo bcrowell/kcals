@@ -4,6 +4,7 @@ require 'json'
 require 'csv' # standard ruby library
 
 require_relative "lib/geometry"
+require_relative "lib/low_level_math"
 
 # See README.md for documentation.
 
@@ -46,7 +47,7 @@ def main
   hv = integrate_horiz_and_vert(cartesian)
     # list of [horiz,vert] positions
 
-  if $xy_filter>0.0 && $osc_h>0.0 then
+  if $xy_filter>0.0 || $osc_h>0.0 then
     r = filter_xyz(hv,cartesian,path)
     hv = r['hv']
     path = r['path']
@@ -209,7 +210,6 @@ def make_profile_csv(hv)
       dv = 0.0
       i=0.0
     end
-    i = in_minetti_range(i) # sanity check, don't contaminate results with bogus stuff
     iota = i_to_iota(i)
     csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]}\n"
     old_h = h
@@ -690,16 +690,10 @@ def minetti_quadratic_coeffs() # my rough approximation to Minetti, optimized to
   return [i0,c0,c2,b0,b1,b2]
 end
 
-def in_minetti_range(i)
-  return -0.5 if i<-0.5
-  return 0.5 if i>0.5
-  return i
-end
-
 def minetti_cr(i)
   # i = gradient
   # cr = cost of running, in J/kg.m
-  i = in_minetti_range(i)
+  if i>0.5 || i<-0.5 then return minetti_steep(i) end
   return 155.4*i**5-30.4*i**4-43.3*i**3+46.3*i**2+19.5*i+3.6
   # note that the 3.6 is different from their best value of 3.4 on the flats, i.e., the polynomial isn't a perfect fit
 end
@@ -707,8 +701,14 @@ end
 def minetti_cw(i)
   # i = gradient
   # cr = cost of walking, in J/kg.m
-  i = in_minetti_range(i)
+  if i>0.5 || i<-0.5 then return minetti_steep(i) end
   return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
+end
+
+def minetti_steep(i)
+  g=9.8 # m/s2=J/kg.m
+  if i>0 then eff=0.23 else eff=-1.2 end
+  return g*i/eff
 end
 
 #=========================================================================
@@ -941,38 +941,6 @@ def get_parameters(cgi,command_line_parameters)
   end
   return input_file
 end
-
-#=========================================================================
-# @@ low-level math
-#=========================================================================
-
-def deg_to_rad(x)
-  return 0.0174532925199433*x
-end
-
-def rad_to_deg(x)
-  return x/0.0174532925199433
-end
-
-def pythag(x,y)
-  return Math::sqrt(x*x+y*y)
-end
-
-def interpolate_square(x,y,z00,z10,z01,z11)
-  root2 = Math::sqrt(2.0)
-  w00 = (root2-pythag(x,y)).abs
-  w10 = (root2-pythag(x-1.0,y)).abs
-  w01 = (root2-pythag(x,y-1.0)).abs
-  w11 = (root2-pythag(x-1.0,y-1.0)).abs
-  norm = w00+w10+w01+w11
-  z = (z00*w00+z10*w10+z01*w01+z11*w11)/norm
-  return z
-end
-
-def linear_interp(x1,x2,s)
-  return x1+s*(x2-x1)
-end
-
 
 #=========================================================================
 # @@ testing

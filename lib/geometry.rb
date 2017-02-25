@@ -33,6 +33,7 @@ end
 
 def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   # Inputs are in degrees, except for alt, which is in meters.
+  # Returns [x,y,z] in meters.
   # The "cartesian" coordinates are not actually cartesian. They're coordinates in which
   # (x,y) are from a polyconic projection https://en.wikipedia.org/wiki/Polyconic_projection
   # centered on (lat0,lon0), and z is altitude.
@@ -41,9 +42,6 @@ def spherical_to_cartesian(lat,lon,alt,lat0,lon0)
   # calculations that treat these as cartesian coordinates are making an approximation. The error
   # should be tiny on the scales we normally deal with. The important thing for our purposes is
   # that the gradient of z is vertical.
-  # The purpose of lat0 and lon0 is to do a rotation to make the cartesian coordinates easier to interpret.
-  # outputs are in meters. We rotate to coordinate axes parallel to NSEWUD at initial point.
-  # The notation in the following is the notation from the WP article.
   lam = deg_to_rad(lon)
   lam0 = deg_to_rad(lon0)
   phi = deg_to_rad(lat)
