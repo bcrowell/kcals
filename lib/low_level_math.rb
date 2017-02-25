@@ -12,10 +12,16 @@ end
 
 def interpolate_square(x,y,z00,z10,z01,z11)
   root2 = Math::sqrt(2.0)
-  w00 = (root2-pythag(x,y)).abs
-  w10 = (root2-pythag(x-1.0,y)).abs
-  w01 = (root2-pythag(x,y-1.0)).abs
-  w11 = (root2-pythag(x-1.0,y-1.0)).abs
+  # w00 = (root2-pythag(x,y)).abs
+  # w10 = (root2-pythag(x-1.0,y)).abs
+  # w01 = (root2-pythag(x,y-1.0)).abs
+  # w11 = (root2-pythag(x-1.0,y-1.0)).abs
+
+  # https://en.wikipedia.org/wiki/Bilinear_interpolation#Unit_Square
+  w00 = (1.0-x)*(1.0-y)
+  w10 = x*(1.0-y)
+  w01 = (1.0-x)*y
+  w11 = x*y
   norm = w00+w10+w01+w11
   z = (z00*w00+z10*w10+z01*w01+z11*w11)/norm
   return z

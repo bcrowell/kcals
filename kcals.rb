@@ -61,7 +61,7 @@ def main
   stats['orig_resolution'] = h/orig_n
 
   if !$cgi then make_path_csv_and_json(path,cartesian,box) end
-  if !$cgi then make_profile_csv(hv) end
+  if !$cgi then make_profile_csv(hv,cartesian) end
   print_stats(stats)
 
   clean_up_temp_files
@@ -194,11 +194,14 @@ def fmt_cart(x) # x is a coordinate in meters; format for spreadsheet output
   return "%.2f" % [x]
 end
 
-def make_profile_csv(hv)
-  csv = "horizontal,vertical,dh,dv,i,iota\n"
+def make_profile_csv(hv,cartesian)
+    # hv = list of [horiz,vert] positions
+    # cartesian = array of [x,y,z]
+  csv = "horizontal,vertical,dh,dv,i,iota,x,y,z\n"
   first = true
   old_h = 0
   old_v = 0
+  k = 0
   hv.each { |a|
     h,v = a
     if !first then
@@ -211,10 +214,12 @@ def make_profile_csv(hv)
       i=0.0
     end
     iota = i_to_iota(i)
-    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]}\n"
+    x,y,z = cartesian[k]
+    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]},#{"%9.2f" % [x]},#{"%9.2f" % [y]},#{"%9.2f" % [z]}\n"
     old_h = h
     old_v = v
     first = false
+    k=k+1
   }
   File.open('profile.csv','w') { |f| 
     f.print csv
