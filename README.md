@@ -90,7 +90,7 @@ Parameters are:
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
-in units of meters. Their defaults values are 100 and 30, respectively. These are meant to get rid of bogus
+in units of meters. Their defaults values are 60 and 30, respectively. These are meant to get rid of bogus
 oscillations in the data. Any elevation (z) changes that occur over horizontal distances less
 than the value of "filtering" will tend to get filtered out, and likewise any horizontal motion that occurs
 over horizontal distances less than the value of "xy_filtering."
@@ -110,12 +110,15 @@ There are several reasons why it may be a good idea to set a fairly large value 
 
  3. If the elevations are being taken from a digital elevation model (DEM), which is generally a good
          idea, then there may still be certain types of errors.
-         Trails and roads are intentionally constructed so as not to go up and down steep hills. For instance,
-         a road may cut straight through a hillside or even go through a tunnel, but this sort of information
-         will not be present in the DEM. Or a road next to a big, steep hillside may show up on the DEM
-         as having a incorrect, high elevation, because the resolution of the DEM (about 30 m for the one
-         used by this software) is such that the hillside's elevation gets averaged in to the elevation
-         of the road below.
+         Trails and roads are intentionally constructed so as not to go up and down steep hills, but
+         the DEM may not accurately reflect this. The most common situation seems to be one in which
+         a trail or road takes a detour into a narrow gully in order to maintain a steady grade.
+         The DEM currently used by this software has a horizontal resolution of 30 meters.
+         If the gully is narrower than this, then the DEM doesn't know about the the gully, and
+         the detour appears to be a steep excursion up and then back down the prevailing slope.
+         I have found empirically that setting filtering=60 m is roughly the minimum that is required
+         in order to eliminate this type of artifact, which makes sense because a detour into a 30 meter
+         gully probably does involve about 60 meters of horizontal travel.
 
 The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
 Higher resolution increases the mileage, because small wiggles get counted in. This has a big effect on

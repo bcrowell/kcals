@@ -141,8 +141,8 @@ def init_globals
   $metric = false
   $running = true # set to false for walking
   $body_mass = 66 # in kg, =145 lb
-  $osc_h = 100.0 # Filter out variations in elevation that occur on horizontal scales shorter than this
-                 # value, in meters. Calculated gain is very sensitive to this.
+  $osc_h = 60.0 # Filter out variations in elevation that occur on horizontal scales shorter than this
+                # value, in meters. Calculated gain is very sensitive to this.
   $format = 'kml' # see README.md for legal values
   $dem = false # attempt to download DEM if absent from input?
   $verbosity = 2 # can go from 0 to 4; 0 means just to output data for use by a script
@@ -277,7 +277,8 @@ def integrate_gain_and_energy(hv)
   h = hv.last[0]-hv[0][0]
   i_rms = Math::sqrt(i_sum_sq/h - (i_sum/h)**2)
   iota_mean = iota_sum/h
-  iota_rms = Math::sqrt(iota_sum_sq/h - (iota_sum/h)**2)
+  iota_rms = iota_sum_sq/h - (iota_sum/h)**2
+  iota_rms = Math::sqrt(iota_rms) if iota_rms>0.0
   i_mean = (hv.last[1]-hv[0][1])/h
   i0,c0,c2,b0,b1,b2 = minetti_quadratic_coeffs()
   e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
