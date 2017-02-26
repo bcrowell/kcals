@@ -55,6 +55,30 @@ def main
   result = find_crossings(paths,grid,box,ngrid,grid_d)
 
   if $verbosity>=3 then print "#{result.length} crossings found\n" end
+
+
+  0.upto(paths.length-1) { |m1|
+    n1 = paths[m1].length
+    0.upto(paths.length-1) { |m2|
+      n2 = paths[m2].length
+      sum_abs = 0
+      sum = 0
+      n = 0
+      result.each { |c|
+        next unless c['m1']==m1 && c['m2']==m2 && !c['gap'].nil?
+
+        # look for crossings near end to get rid of drift
+        k1 = c['n1']; k2 = c['n2']; f1=k1.to_f/n1; f2=k2.to_f/n2
+        next unless f1>0.8 && f2>0.8
+
+        gap = c['gap']
+        n = n+1
+        sum = sum + gap
+        sum_abs = sum_abs + gap.abs
+      }
+      if n>0 then print "gap between #{m1} and #{m2}, n=#{n}, mean=#{sum/n}, mean abs=#{sum_abs/n}\n" end
+    }
+  }
 end
 
 def find_crossings(paths,grid,box,ngrid,grid_d)
@@ -71,18 +95,26 @@ def find_crossings(paths,grid,box,ngrid,grid_d)
           next if grid[[i,j]].nil?
           grid[[i,j]].each { |seg|
             m2,v = seg # path m2's segment from vertex v to its successor may cross (i,j)
-            next unless m2>m
+            next unless m2>=m # self-crossings can be OK, e.g., on an out-and-back, but need to ignore trivial ones
             r = v['p']
             s = v['succ']['p']
             rs = dist2d(r,s)
             closest = [dist2d(p,r),dist2d(p,s),dist2d(q,r),dist2d(q,s)].min
             next if closest>pq+rs
+            next if closest<1.0e-10 # trivial self-crossing
             # look for intersection of pq with rs
             x,mu,lambda = intersection_of_segments(p,q,r,s,true)
             next if x.nil?
             tangent = normalize2d(add2d(normalize2d(sub2d(q,p)),normalize2d(sub2d(s,r))))
-            print "crossing between paths #{m} and #{m2}, x=#{x}\n" if $verbosity>=4
-            result.push({'p'=>x,'mu'=>mu,'lambda'=>lambda,'t'=>tangent})
+            height_gap = nil
+            if !p[2].nil? && !r[2].nil? then # we have elevation data
+              z1 = p[2]+lambda*(q[2]-p[2])
+              z2 = r[2]+lambda*(s[2]-r[2])
+              height_gap = z2-z1
+            end
+            print "crossing between paths #{m} and #{m2}, x=#{x},     gap=#{height_gap}\n" if $verbosity>=4
+            result.push({'p'=>x,'mu'=>mu,'lambda'=>lambda,'t'=>tangent,'m1'=>m,'m2'=>m2,'gap'=>height_gap,
+                         'n1'=>path[n]['n'],'n2'=>v['n'],})
           }
         }
       }
@@ -167,6 +199,9 @@ def build_grid(paths,grid_d,box)
       # of the form [[m,v],[m2,v2],...], meaning that path m's segment from vertex v to its successor may cross (i,j)
   0.upto(paths.length-1) { |m|
     path = paths[m]
+    0.upto(path.length-1) { |n|
+      path[n]['n'] = n
+    }
     0.upto(path.length-2) { |n|
       path[n]['succ'] = path[n+1]
       p = path[n]['p']

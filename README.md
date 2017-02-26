@@ -26,14 +26,11 @@ The web interface is available [here](http://www.lightandmatter.com/kcals)
 
 synopsis:
 
-`kcals.rb <route.kml` ... read parameters from preferences file
+`kcals.rb route.kml`
 
-`kcals.rb format=txt filtering=600 weight=58 <route.txt` ... override parameters from command line
+`kcals.rb filtering=600 weight=58 route.kml`
 
-`kcals.rb filtering=600 weight=58 route.txt` ... final parameter interpreted as input file, format inferred
-
-The input formats that are supported are KML and the text format
-written by gpsvisualizer.com.  Total stats are written to standard output.
+Total stats are written to standard output.
 
 Also writes some spreadsheet data to profile.csv and path.csv.
 The profile.csv file can be used to graph the elevation profile. 
@@ -48,7 +45,7 @@ kml - the default
 
 gpx
 
-text - the text format written by gpsvisualizer.com
+txt - the text format written by gpsvisualizer.com
 
 csv - the unicsv format written by gpsbabel (or any CSV file with some of its columns labeled
 Latitude, Longitude, and possibly Altitude)
@@ -82,6 +79,8 @@ Parameters are:
 
   filtering -- see below
 
+  xy_filtering -- see below
+
   format -- see above for supported formats
 
   verbosity -- a level from 0 to 3
@@ -91,7 +90,7 @@ Parameters are:
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
-in units of meters. Their defaults values are 200 and 30, respectively. These are meant to get rid of bogus
+in units of meters. Their defaults values are 100 and 30, respectively. These are meant to get rid of bogus
 oscillations in the data. Any elevation (z) changes that occur over horizontal distances less
 than the value of "filtering" will tend to get filtered out, and likewise any horizontal motion that occurs
 over horizontal distances less than the value of "xy_filtering."
@@ -147,5 +146,7 @@ apt-get install libgdal-dev gdal-bin python-gdal python-pip
 pip install elevation
 
 ### CGI
+
+Edit the URL used in kcals.html to refer to kcals.cgi.
 
 sudo make cgi

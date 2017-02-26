@@ -1,10 +1,10 @@
 HTML = /var/www
 # ... may be /var/www/html on some systems
 
-$(CGI-BIN) = /usr/lib/cgi-bin
-$(BIN) = $(CGI-BIN)/kcals
-$(LIB) = $(BIN)/lib
-$(SCRATCH) = $(BIN)/scratch
+CGI-BIN = /usr/lib/cgi-bin
+BIN = $(CGI-BIN)/kcals
+LIB = $(BIN)/lib
+SCRATCH = $(BIN)/scratch
 
 default:
 	./kcals.rb <sample.txt && head kcals.csv
