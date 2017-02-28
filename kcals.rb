@@ -56,10 +56,19 @@ def main
   end
 
   h = hv.last[0]
-  stats = integrate_gain_and_energy(hv)
-  stats['h'] = h
+
+  rescale = 1.0
+  if !$nominal_h.nil? then
+    rescale = $nominal_h/h
+    if rescale<0.8 or rescale>1.2 then warning("To make the distance equal to its nominal value, it was necessary to rescale by #{(rescale-1.0)*100}%, which is greater than 20%.") end
+  end
+
+  stats = integrate_gain_and_energy(hv,rescale)
   stats['orig_n'] = orig_n
   stats['orig_resolution'] = h/orig_n
+
+  h = stats['h'] # may change its value if rescale!=1
+  if !$nominal_h.nil? && ((h-$nominal_h)/h).abs>1.0e-6 then warning("Integrated h = #{h} not within 1 ppm of nominal_h = #{$nominal_h}") end
 
   if !$cgi then make_path_csv_and_json(path,cartesian,box) end
   if !$cgi then make_profile_csv(hv,cartesian) end
@@ -100,7 +109,7 @@ def print_stats(stats)
     print "slope distance = #{"%.2f" % [d]} #{h_unit}\n"
     print "gain = #{"%.0f" % [gain]} #{v_unit}\n"
     print "cost = #{"%.0f" % [kcals]} kcals\n"
-    print "CF (fraction of effort due to climbing) = #{"%4.f" % [cf*100.0]} %\n"
+    print "CF (fraction of effort due to climbing) = #{"%5.1f" % [cf*100.0]} %\n"
     if $verbosity>=3 then
       print "i_rms = #{"%.4f" % [i_rms]}\n"
       print "baumel_si = #{baumel_si} m\n"
@@ -156,6 +165,9 @@ def init_globals
                      # described above in the comment describing $resolution
   $xy_filter = 30.0 # meters
   $method = 1 # 1 means new filtering method
+  $nominal_h = nil # nominal distance; is internally in meters, but specified in input as
+                   # miles or km, depending on $metric; actual distances are scaled to make total
+                   # equal to this value
 
   $server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
   $server_max_points = 2000 # and max number of points
@@ -231,7 +243,7 @@ end
 # @@ integration of results
 #=========================================================================
 
-def integrate_gain_and_energy(hv)
+def integrate_gain_and_energy(hv,rescale)
   # integrate to find total gain, slope distance, and energy burned
   # returns {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,...}
   v = 0 # total vertical distance (=0 at end of a loop)
@@ -246,19 +258,19 @@ def integrate_gain_and_energy(hv)
   iota_sum = 0.0
   iota_sum_sq = 0.0
   baumel_si = 0.0 # compute this directly as a check
+  h_reintegrated = 0.0 # if rescale!=1, this should be the same as nominal_h
   hv.each { |a|
     h,v = a
     if !first then
-      dh = h-old_h
+      dh = (h-old_h)*rescale
       dv = v-old_v
       dd = Math::sqrt(dh*dh+dv*dv)
+      h_reintegrated = h_reintegrated+dh
       d = d+dd
       if dv>0 then gain=gain+dv end
       i=0
       if dh>0 then i=dv/dh end
       if dh>0 then baumel_si=baumel_si+dv**2/dh end
-      if i>1.0 then i=1.0 end # sanity check, sometimes we get large bogus values that would mess up stats
-      if i<-1.0 then i=-1.0 end # ...
       # In the following, weight by dh, although normally this doesn't matter because we make the
       # h intervals constant before this point.
       i_sum = i_sum + i*dh
@@ -274,7 +286,7 @@ def integrate_gain_and_energy(hv)
     first = false
   }
   n = hv.length-1.0
-  h = hv.last[0]-hv[0][0]
+  h = h_reintegrated # should equal $nominal_h; may differ from hv.last[0]-hv[0][0] if rescale!=1
   i_rms = Math::sqrt(i_sum_sq/h - (i_sum/h)**2)
   iota_mean = iota_sum/h
   iota_rms = iota_sum_sq/h - (iota_sum/h)**2
@@ -283,7 +295,7 @@ def integrate_gain_and_energy(hv)
   i0,c0,c2,b0,b1,b2 = minetti_quadratic_coeffs()
   e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
   cf = (c-h*$body_mass*minetti(0.0))/c
-  return {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
+  return {'c'=>c,'h'=>h,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
            'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf,'baumel_si'=>baumel_si}
 end
 
@@ -826,6 +838,11 @@ def set_param(par,value,where,s)
   if par=='force_dem' then recognized=true; $force_dem=(value.to_i==1) end
   if par=='infile' then recognized=true; $infile=value end
   if par=='test' then recognized=true; $test=value end
+  if par=='nominal_h' then
+    recognized=true;
+    $nominal_h = value.to_f
+    if $metric then $nominal_h=$nominal_h*1000.0 else $nominal_h=$nominal_h*1609.344 end # convert to meters
+  end
   if par=='format' then
     recognized=true
     $format=value
