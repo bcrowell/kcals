@@ -63,7 +63,7 @@ def main
     if rescale<0.8 or rescale>1.2 then warning("To make the distance equal to its nominal value, it was necessary to rescale by #{(rescale-1.0)*100}%, which is greater than 20%.") end
   end
 
-  stats = integrate_gain_and_energy(hv,rescale)
+  stats,hv = integrate_gain_and_energy(hv,rescale)
   stats['orig_n'] = orig_n
   stats['orig_resolution'] = h/orig_n
 
@@ -72,7 +72,7 @@ def main
 
   if !$cgi then make_path_csv_and_json(path,cartesian,box) end
   if !$cgi then make_profile_csv(hv,cartesian,rescale) end
-  print_stats(stats)
+  print_stats(stats,hv,rescale)
 
   clean_up_temp_files
 
@@ -82,7 +82,7 @@ end
 # @@ helper routines for main
 #=========================================================================
 
-def print_stats(stats)
+def print_stats(stats,hv,rescale)
   h,c,d,gain,i_rms,e_q = stats['h'],stats['c'],stats['d'],stats['gain'],stats['i_rms'],stats['e_q']
   iota_mean,iota_rms,cf = stats['iota_mean'],stats['iota_rms'],stats['cf']
   orig_n,orig_resolution,baumel_si = stats['orig_n'],stats['orig_resolution'],stats['baumel_si']
@@ -118,6 +118,25 @@ def print_stats(stats)
       print "iota_sd = #{"%.4f" % [iota_rms]}\n"
       print "orig_n = #{orig_n}\n"
       print "resolution ~ orig_n/distance = #{"%.2f" % [orig_resolution]} m\n"
+    end
+    if $verbosity>=2 then
+      if !stats['power'].nil? then 
+        print "power = #{stats['power']} W\n"
+        splits = []
+        1.upto((h_raw/distance_unit()+0.49).floor) { |a|
+          hh = a*distance_unit()
+          tt = 0.0
+          hv.each { |hhh,v,t|
+            if hhh*rescale>hh then tt=t; break end
+          }
+          splits.push([a,tt])
+        }
+        splits.push([h_raw/distance_unit(),stats['t']])
+        print "predicted split times:\n"
+        splits.each { |dist,tt|
+          print "  distance=#{"%4.1f" % dist} #{h_unit}, time=#{seconds_to_time_string(tt)}\n"
+        }
+      end
     end
   else
     print JSON.generate({
@@ -168,6 +187,8 @@ def init_globals
   $nominal_h = nil # nominal distance; is internally in meters, but specified in input as
                    # miles or km, depending on $metric; actual distances are scaled to make total
                    # equal to this value
+  $my_h = nil # distance for setting expected pace
+  $my_t = nil # time for setting expected pace
 
   $server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
   $server_max_points = 2000 # and max number of points
@@ -245,7 +266,9 @@ end
 
 def integrate_gain_and_energy(hv,rescale)
   # integrate to find total gain, slope distance, and energy burned
-  # returns {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,...}
+  # returns [stats,hv], where:
+  #   stats = {'c'=>c,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,...}
+  #   hv = modified copy of input hv, with predicted times added, if we have the necessary data
   v = 0 # total vertical distance (=0 at end of a loop)
   d = 0 # total distance along the slope
   gain = 0 # total gain
@@ -258,7 +281,15 @@ def integrate_gain_and_energy(hv,rescale)
   iota_sum = 0.0
   iota_sum_sq = 0.0
   baumel_si = 0.0 # compute this directly as a check
+  have_pace = !$my_h.nil? && !$my_t.nil? && $my_t!=0.0
+  if have_pace then
+    power = $my_h*$body_mass*minetti(0.0)/$my_t # in watts
+  else
+    power = nil
+  end
+  t = 0.0 # integrated time, in seconds
   h_reintegrated = 0.0 # if rescale!=1, this should be the same as nominal_h
+  k = 0
   hv.each { |a|
     h,v = a
     if !first then
@@ -278,8 +309,14 @@ def integrate_gain_and_energy(hv,rescale)
       iota = i_to_iota(i)
       iota_sum = iota_sum + iota*dh
       iota_sum_sq = iota_sum_sq + iota*iota*dh
-      c = c+dd*$body_mass*minetti(i)
+      dc = dd*$body_mass*minetti(i)
            # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
+      c = c+dc
+      if !power.nil? then
+        t=t+dc/power
+        hv[k] = h,v,t
+      end
+      k=k+1
     end
     old_h = h
     old_v = v
@@ -295,8 +332,10 @@ def integrate_gain_and_energy(hv,rescale)
   i0,c0,c2,b0,b1,b2 = minetti_quadratic_coeffs()
   e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
   cf = (c-h*$body_mass*minetti(0.0))/c
-  return {'c'=>c,'h'=>h,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
-           'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf,'baumel_si'=>baumel_si}
+  stats = {'c'=>c,'h'=>h,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
+           'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf,'baumel_si'=>baumel_si,'power'=>power,
+           't'=>t}
+  return [stats,hv]
 end
 
 def integrate_horiz_and_vert(cartesian)
@@ -838,17 +877,41 @@ def set_param(par,value,where,s)
   if par=='force_dem' then recognized=true; $force_dem=(value.to_i==1) end
   if par=='infile' then recognized=true; $infile=value end
   if par=='test' then recognized=true; $test=value end
-  if par=='nominal_h' then
-    recognized=true;
-    $nominal_h = value.to_f
-    if $metric then $nominal_h=$nominal_h*1000.0 else $nominal_h=$nominal_h*1609.344 end # convert to meters
-  end
+  if par=='nominal_h' then recognized=true; $nominal_h = (value.to_f)*distance_unit() end
+  if par=='my_h' then recognized=true; $my_h = (value.to_f)*distance_unit() end
+  if par=='my_t' then recognized=true; $my_t = time_string_to_seconds(value) end
   if par=='format' then
     recognized=true
     $format=value
     explicit_format = true
   end
   if !recognized then fatal_error("illegal parameter #{par}#{where}:\n#{s}") end
+end
+
+def distance_unit
+  if $metric then 
+    return 1000.0 # conversion from km to m
+  else
+    return 1609.344 # conversion from miles to m
+  end
+end
+
+def seconds_to_time_string(t)
+  if t<60.0 then return "%02d" % t end
+  x = (t/60.0).floor
+  return seconds_to_time_string(x) + ':' + ("%02d" % (t-x*60))
+  # return ("%02d" % x) + ':' + seconds_to_time_string(t-x*60)
+end
+
+def time_string_to_seconds(x) # is tested in method test()
+  # convert a string of the form h:m:s to seconds
+  if !(x=~/:/) then colons=0 end
+  if (x=~/:/) && !(x=~/:.*:/) then colons=1 end
+  if x=~/:.*:/ then colons=2 end
+  if colons==0 then h=0; m=0; s=x.to_i end
+  if colons==1 then h=0; x=~/(.*):(.*)/; m,s=$1.to_i,$2.to_i end
+  if colons==2 then x=~/(.*):(.*):(.*)/; h,m,s=$1.to_i,$2.to_i,$3.to_i end
+  return (h*3600+m*60+s).to_f
 end
 
 def handle_param(s,where)
@@ -915,6 +978,9 @@ end
 
 # to run this test, execute the software with test=1
 def test
+  print "time_string_to_seconds(37)=#{time_string_to_seconds('37')}\n"
+  print "time_string_to_seconds(1:37)=#{time_string_to_seconds('1:37')}\n"
+  print "time_string_to_seconds(1:00:37)=#{time_string_to_seconds('1:00:37')}\n"
   # manker flat
   lat=34.266225
   lon=-117.626925

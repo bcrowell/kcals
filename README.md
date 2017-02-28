@@ -89,6 +89,10 @@ Parameters are:
 
   nominal_h -- the nominal distance of the run, in miles if metric=0, km if metric=1; see below
 
+  my_h -- a distance, in miles if metric=0, km if metric=1; used for estimating times, see below
+
+  my_t -- a time, in h:m:s, m:s, or s format; used for estimating times, see below
+
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
@@ -153,6 +157,16 @@ This scaling factor strongly affects the estimate of energy consumption, which d
 on the total horizontal distance. In the example above, there will also be a slight additional
 decrease in energy consumption because all of the slopes go down a little. The scaling factor
 is taken into account in the output file profile.csv, but not in path.csv.
+
+## Estimating times
+
+If the parameters my_h and my_t are set, then they are used as a reference distance and time for
+estimating how fast the runner runs. For example, if metric=0, then I can put in 
+my_h=13.11 and my_t=1:39:21 to represent my half-marathon pace. These figures are used to estimate
+the runner's power output in watts. The power, in turn, is used to estimate times. If my_h and my_t
+are both set, then split times will be estimated. Example:
+
+`kcals.rb dem=1 nominal_h=13.11 my_h=13.11 my_t=1:39:21 chino_hills_half_marathon.gpx`
 
 ## Installing
 
