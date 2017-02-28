@@ -71,7 +71,7 @@ def main
   if !$nominal_h.nil? && ((h-$nominal_h)/h).abs>1.0e-6 then warning("Integrated h = #{h} not within 1 ppm of nominal_h = #{$nominal_h}") end
 
   if !$cgi then make_path_csv_and_json(path,cartesian,box) end
-  if !$cgi then make_profile_csv(hv,cartesian) end
+  if !$cgi then make_profile_csv(hv,cartesian,rescale) end
   print_stats(stats)
 
   clean_up_temp_files
@@ -207,7 +207,7 @@ def fmt_cart(x) # x is a coordinate in meters; format for spreadsheet output
   return "%.2f" % [x]
 end
 
-def make_profile_csv(hv,cartesian)
+def make_profile_csv(hv,cartesian,rescale)
     # hv = list of [horiz,vert] positions
     # cartesian = array of [x,y,z]
   csv = "horizontal,vertical,dh,dv,i,iota,x,y,z\n"
@@ -218,7 +218,7 @@ def make_profile_csv(hv,cartesian)
   hv.each { |a|
     h,v = a
     if !first then
-      dh = h-old_h
+      dh = (h-old_h)*rescale
       dv = v-old_v
       i = dv/dh
     else
@@ -228,7 +228,7 @@ def make_profile_csv(hv,cartesian)
     end
     iota = i_to_iota(i)
     x,y,z = cartesian[k]
-    csv = csv + "#{"%9.2f" % [h]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]},#{"%9.2f" % [x]},#{"%9.2f" % [y]},#{"%9.2f" % [z]}\n"
+    csv = csv + "#{"%9.2f" % [h*rescale]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh*rescale]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]},#{"%9.2f" % [x]},#{"%9.2f" % [y]},#{"%9.2f" % [z]}\n"
     old_h = h
     old_v = v
     first = false

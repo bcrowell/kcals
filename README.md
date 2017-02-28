@@ -87,6 +87,8 @@ Parameters are:
 
   dem -- 1 means try to download elevation data if it's not included in the input, 0 means don't
 
+  nominal_h -- the nominal distance of the run, in miles if metric=0, km if metric=1; see below
+
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
@@ -135,6 +137,22 @@ http://www.gpsvisualizer.com/elevation . Under "output," select
 
 (2) Set dem=1, and if the software detects that elevation information is missing from the input
 file, it will download it.
+
+## Nominal distances
+
+The nominal_h parameter allows you to force the distance to equal some set value. For example,
+the Chino Hills Half Marathon is supposed to be the standard half-marathon distance of 13.1 miles.
+I clicked on a satellite image in mapmyrun.com to make a polygonal approximation to the course,
+saved it in a KML file, and analyzed it using kcals.
+The distance came out to be 12.4 mi, which is a little short, presumably because I was somewhat
+sloppy about making the polygon's resolution fine enough to accurately match the course.
+By setting nominal_h=13.1 (with metric=0, so that the units are miles), I can roughly get rid
+of this inaccuracy by scaling up all the horizontal distances by the appropriate factor.
+
+This scaling factor strongly affects the estimate of energy consumption, which depends mainly
+on the total horizontal distance. In the example above, there will also be a slight additional
+decrease in energy consumption because all of the slopes go down a little. The scaling factor
+is taken into account in the output file profile.csv, but not in path.csv.
 
 ## Installing
 
