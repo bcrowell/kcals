@@ -83,7 +83,7 @@ def main
   true_path.each { |p|
     x,y = p
     lat,lon,alt = cartesian_to_spherical(x,y,0.0,lat0,lon0)
-    if i%10==skip then result['path'].push([lat,lon,0.0,x,y,0.0]) end
+    if i%skip==0 then result['path'].push([lat,lon,0.0,x,y,0.0]) end
     i=i+1
   }
   File.open('path.json','w') { |f|
