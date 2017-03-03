@@ -179,7 +179,7 @@ def window(x)
   # Neg imputs are OK too.
   # Some people do an outer product for 2-dim applications, but I want this to be rotationally invariant.
   if x>=1.0 || x<=-1.0 then return 0 end
-  return 0.5*(1+Math::cos(x/Math::PI))
+  return 0.5*(1+Math::cos(x*Math::PI))
 end
 
 def require_param(params,name)

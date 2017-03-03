@@ -66,7 +66,7 @@ straight line segments connecting the waypoints.
 
 ## Parameters and preferences
 
-Preferences are read from the file ~/.kcals, but can be overridden from the command line
+Preferences are read from the file ~/.kcals, but can be overridden from the command line.
 See the file sample_prefs for a sample preferences file.
 
 Parameters are:
