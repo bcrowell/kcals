@@ -10,7 +10,7 @@ require_relative "#{$lib}/low_level_math"
 require_relative "#{$lib}/system"
 
 # usage:
-#   ./propel.rb '{"lati":34.26645,"loni":-117.62755,"h":10.0,"dparmax":0.25,"eps":3.0,"skip":10}' baldy/preprocessed/baldy_0*.json
+#   ./propel.rb '{"lati":34.26645,"loni":-117.62755,"h":10.0,"g":10.0,"w":"hann","dparmax":0.25,"eps":3.0,"skip":10}' baldy/preprocessed/baldy_0*.json
 # First arg is parameters, formatted as a JSON hash.
 # The rest are files giving polygonal approximations to gps tracks. They should
 # contain columns x and y -- maybe z? Can contain other columns.
@@ -18,6 +18,8 @@ require_relative "#{$lib}/system"
 # parameters:
 #   lati,loni -- initial lat and lon, in degrees
 #   h -- in meters, sets the width of the window for averaging of paths
+#   g -- in meters, sets inverse strength of transverse force
+#   w -- 'hann' or 'square'
 #   dparmax -- unitless; ignore points on a path that differ in estimated parameter by more than this fractional amount
 #   eps -- distance to move in meters at each step
 #   skip -- e.g., if this is 10, then only write every 10th point to the output files
@@ -58,6 +60,8 @@ def main
   lati = require_param(params,'lati') 
   loni = require_param(params,'loni') 
   h = require_param(params,'h')
+  g = require_param(params,'g')
+  w = require_param(params,'w')
   dparmax = require_param(params,'dparmax')
   eps = require_param(params,'eps')
   skip = require_param(params,'skip')
@@ -73,7 +77,7 @@ def main
 
   if $verbosity>=3 then print "bounding box: x=#{x_lo},#{x_hi}, y=#{y_lo},#{y_hi}, ngrid=#{ngrid}, lati,loni=#{lati},#{loni} xi,yi=#{xi},#{yi} l=#{l}\n" end
 
-  d,true_path = propel(paths,xi,yi,xi,yi,eps,h,l,dparmax,box,ngrid,grid_d,grid)
+  d,true_path = propel(paths,xi,yi,xi,yi,eps,h,g,w,l,dparmax,box,ngrid,grid_d,grid)
         # true_path = array of points
         # FIXME -- assumes final point is same as initial
   print "total horizontal distance = #{d/1000.0} km\n"
@@ -111,13 +115,15 @@ end
 def estimate_length(path)
   d = 0.0
   path[0]['d'] = 0.0
+  path[0]['i'] = 0
   0.upto(path.length-2) { |n|
     d = d+dist2d(path[n]['p'],path[n+1]['p'])
     path[n+1]['d'] = d
+    path[n+1]['i'] = n+1
   }
 end
 
-def propel(paths,xi,yi,xf,yf,eps,h,l,dparmax,box,ngrid,grid_d,grid)
+def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,box,ngrid,grid_d,grid)
   # l = estimated length of entire path
   p = [xi,yi]
   n = paths.length
@@ -128,21 +134,26 @@ def propel(paths,xi,yi,xf,yf,eps,h,l,dparmax,box,ngrid,grid_d,grid)
   approaching_finish = false
   closest_approach_to_finish = 1.0e10
   i=0
+  most_recent_i = Array.new(paths.length, 0) # new, optional method to prevent backtracking and dithering
   while true
     f = [0.0,0.0]
     0.upto(paths.length-1) { |m|
       path = paths[m]
-      r,q,t = closest_point(p,m,paths,box,ngrid,grid_d,grid,d,max_par_diff) # r,q,t=distance,point,tangent
-      # print "r,q,t=#{r},    #{q},    #{t}\n"
+      r,q,t,ii = closest_point(p,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,most_recent_i[m])
+              # r,q,t=distance,point,tangent,index
+      if !ii.nil? then most_recent_i[m]=ii end
       next if r>=h
       u = r/h
-      w = window(u)
+      w = window(u,window_type)
       t = normalize2d(t)
       # longitudinal propulsive force
-      f = add2d(f,scalar_mul2d(t,w))
+      f_lon = scalar_mul2d(t,w)
+      f = add2d(f,f_lon)
       # attractive transverse force
       rhat = normalize2d(sub2d(q,p))
-      f = add2d(f,scalar_mul2d(rhat,w*u))
+      f_tr = scalar_mul2d(rhat,w*(r/g))
+      f = add2d(f,f_tr)
+      if i>3555 && i<3600 then print "m=#{m}, q-p=#{sub2d(q,p)} f_lon=#{f_lon},   f_tr=#{f_tr}\n" end # qwe
     }
     if mag2d(f)==0.0 then
       print "propel() terminated with f=0 at d=#{d} meters\n"
@@ -162,6 +173,7 @@ def propel(paths,xi,yi,xf,yf,eps,h,l,dparmax,box,ngrid,grid_d,grid)
       closest_approach_to_finish = d_finish
     end
     f = normalize2d(f)
+    if i>3555 && i<3600 then print "d=#{d},    p=#{p},    f=#{f}, i=#{i}\n" end # qwe
     dp = scalar_mul2d(f,eps)
     d = d+mag2d(dp)
     p = add2d(p,dp)
@@ -172,14 +184,21 @@ def propel(paths,xi,yi,xf,yf,eps,h,l,dparmax,box,ngrid,grid_d,grid)
   return [d,true_path]
 end
 
-def window(x)
-  # 2-dimensional rotation of Hann window
+def window(x,window_type)
   # Output is in [0,1].
   # Input is meant to be positive, prescaled distance, with [0,1) giving nonzero results.
-  # Neg imputs are OK too.
-  # Some people do an outer product for 2-dim applications, but I want this to be rotationally invariant.
+  # Neg inputs are OK too.
+
   if x>=1.0 || x<=-1.0 then return 0 end
-  return 0.5*(1+Math::cos(x*Math::PI))
+
+  if w=='square' then
+    return 1.0  
+  end
+  if w=='hann' then
+    # 2-dimensional rotation of Hann window
+    # Some people do an outer product for 2-dim applications, but I want this to be rotationally invariant.
+    return 0.5*(1+Math::cos(x*Math::PI))
+  end
 end
 
 def require_param(params,name)
@@ -190,16 +209,17 @@ end
 
 # Given a point x, find the nearest point (vertex or interior) on path m.
 # Return [distance,point,tangent].
-def closest_point(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff)
+def closest_point(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i)
   i,j=point_to_grid(x,box,grid_d)
   min_d = 1.0e10
   best_p = nil
   best_t = nil
+  best_i = nil
   0.upto(ngrid-1) { |r|
     # trace a 2r x 2r square around grid square i,j
     -r.upto(r) { |u|
       best = (r-1.0)*grid_d # closest we could get from now on
-      return [min_d,best_p,best_t] if best>min_d*1.414
+      return [min_d,best_p,best_t,best_i] if best>min_d*1.414 # This is the normal exit, but there is another below.
       0.upto(3) { |edge| # top, bottom, right, left
         ii = i
         jj = j
@@ -212,17 +232,19 @@ def closest_point(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff)
           mm,v = seg # path mm's segment from vertex v to its successor may cross (ii,jj)
           next if mm!=m
           next if (v['d']-d).abs>max_par_diff
+          next if v['i']<not_before_i
           dd,p,t = closest_point_on_segment(x,v['p'],v['succ']['p'])
           if dd<min_d then
             min_d=dd
             best_p = p
             best_t = t
+            best_i = v['i']
           end
         }
       }
     }
   }
-  return [min_d,best_p,best_t] # This is not the normal way we exit.
+  return [min_d,best_p,best_t,best_i] # This is not the normal way we exit.
 end
 
 # Given a point x and a segment pq, find the point on segment pq closest to x.

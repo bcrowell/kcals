@@ -3,6 +3,7 @@
 require 'json'
 require 'csv' # standard ruby library
 
+require_relative "lib/physiology"
 require_relative "lib/geometry"
 require_relative "lib/low_level_math"
 require_relative "lib/system"
@@ -699,75 +700,6 @@ def add_dem(path,box)
   return path2
 end
 
-#=========================================================================
-# @@ physiological model
-#=========================================================================
-
-# For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
-
-def minetti(i)
-  if $running then return minetti_cr(i) else return minetti_cw(i) end
-end
-
-def i_to_iota(i)
-  # convert i to a linearized scale iota, where iota^2=[C(i)-C(imin)]/c2 and sign(iota)=sign(i-imin)
-  # The following are the minima of the Minetti functions.
-  if $running then
-    imin = -0.181355
-    cmin = 1.781269
-    c2=66.0
-  else
-    imin = -0.152526
-    cmin= 0.935493
-    c2=94.0
-  end
-  c=minetti(i) # automatically brings i in sane range if out of range
-  if c<cmin then 
-    # warning("c=#{c}, cmin=#{cmin}, i=#{i}, imin=#{imin}, running=#{$running}") 
-    # happens sometimes due to rounding
-    c=cmin
-  end
-  result = Math::sqrt((c-cmin)/c2)
-  if i<imin then result= -result end
-  return result
-end
-
-def minetti_quadratic_coeffs() # my rough approximation to Minetti, optimized to fit the range that's most common
-  if $running then
-    i0=-0.15
-    c0=1.84
-    c2=66.0
-  else
-    i0=-0.1
-    c0=1.13
-    c2=94.0
-  end
-  b0=c0+c2*i0*i0
-  b1=-2*c2*i0
-  b2=c2
-  return [i0,c0,c2,b0,b1,b2]
-end
-
-def minetti_cr(i)
-  # i = gradient
-  # cr = cost of running, in J/kg.m
-  if i>0.5 || i<-0.5 then return minetti_steep(i) end
-  return 155.4*i**5-30.4*i**4-43.3*i**3+46.3*i**2+19.5*i+3.6
-  # note that the 3.6 is different from their best value of 3.4 on the flats, i.e., the polynomial isn't a perfect fit
-end
-
-def minetti_cw(i)
-  # i = gradient
-  # cr = cost of walking, in J/kg.m
-  if i>0.5 || i<-0.5 then return minetti_steep(i) end
-  return 280.5*i**5-58.7*i**4-76.8*i**3+51.9*i**2+19.6*i+2.5
-end
-
-def minetti_steep(i)
-  g=9.8 # m/s2=J/kg.m
-  if i>0 then eff=0.23 else eff=-1.2 end
-  return g*i/eff
-end
 
 #=========================================================================
 # @@ reading input files
@@ -978,6 +910,13 @@ end
 
 # to run this test, execute the software with test=1
 def test
+  $running = false
+  i=0.0
+  -20.upto(20) { |ii|
+    i = ii/40.0
+    print "minetti, i=#{i}, polynomial=#{minetti(i)}, smooth=#{minetti_smooth(i)}\n"
+  }
+  exit(0)
   print "time_string_to_seconds(37)=#{time_string_to_seconds('37')}\n"
   print "time_string_to_seconds(1:37)=#{time_string_to_seconds('1:37')}\n"
   print "time_string_to_seconds(1:00:37)=#{time_string_to_seconds('1:00:37')}\n"
