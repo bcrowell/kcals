@@ -161,9 +161,6 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,bump,box,ngrid,grid_d
         warnings[m]['out_of_range'] = true
         print "track #{m} is #{r} meters away, which is more than 1 km, at d=#{d}\n"
       end
-      if false && m==0 then # qwe
-        print "track #{m} is #{r} meters away, i=#{ii}, at d=#{d}\n"
-      end
       if !ii.nil? && ii>most_recent_i[m] then most_recent_i[m]=ii end
       next if r>=h
       u = r/h
@@ -231,19 +228,12 @@ end
 # (tried moving to average of the points, but the average could then be nowhere near any point)
 def do_bump(p,paths,most_recent_i,eps)
   old_p = p
-
-  old_i = most_recent_i[0] # qwe
-
   0.upto(most_recent_i.length-1) { |m| most_recent_i[m] = most_recent_i[m]+1 }
-
-  new_i = most_recent_i[0] # qwe
-  print "do_bump, old=#{old_i}, new=#{new_i}, length=#{paths[0].length}\n" # qwe
-
   i = most_recent_i[0]
   if i>paths[0].length-1 then return [true,p] end
   p = paths[0][i]['p']
   p = add2d(p,[0.0001,0.0001]) # without this, we get errors because we're not in general position
-  if dist2d(old_p,p)>10.0*eps then
+  if dist2d(old_p,p)>100.0*eps then
     print "warning in do_bump, hop of #{dist2d(old_p,p)}, #{paths[0][i-1]['p']}, #{paths[0][i]['p']}, bumped to i=#{most_recent_i[0]}\n"
     0.upto(most_recent_i.length-1) { |m|
       print "paths[#{m}][...]=#{paths[m][most_recent_i[m]]['p']}\n"
