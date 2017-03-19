@@ -23,7 +23,8 @@ end
 #    c = 1.47422680412371
 #    b = 0.0385908791280687
 #    d = -0.0741786448190981
-# I then optimized the parameters further, including p, numerically.
+# I then optimized the parameters further, including p, numerically, to fit the above criteria.
+# Also checked that it agrees well with the polynomial for a reasonable range of i values.
 
 def minetti_original(i) # their 5th-order polynomial fits; these won't work well at extremes of i
   if $running then return minetti_cr(i) else return minetti_cw(i) end
@@ -41,6 +42,8 @@ def i_to_iota(i)
     cmin= 0.935493
     c2=94.0 # see comments at minetti_quadratic_coeffs()
   end
+  if i.class != Float then i=to_f(i) end
+  if i.infinite? then return i end
   c=minetti(i)
   if c<cmin then 
     # warning("c=#{c}, cmin=#{cmin}, i=#{i}, imin=#{imin}, running=#{$running}") 
@@ -52,7 +55,8 @@ def i_to_iota(i)
   return result
 end
 
-def minetti_quadratic_coeffs() # my rough approximation to Minetti, optimized to fit the range that's most common
+def minetti_quadratic_coeffs()
+  # my rough approximation to Minetti, optimized to fit the range that's most common
   if $running then
     i0=-0.15
     c0=1.84

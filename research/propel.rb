@@ -10,7 +10,7 @@ require_relative "#{$lib}/low_level_math"
 require_relative "#{$lib}/system"
 
 # usage:
-#   ./propel.rb '{"lati":34.26645,"loni":-117.62755,"h":10.0,"g":10.0,"w":"hann","dparmax":0.25,"eps":3.0,"skip":10}' baldy/preprocessed/baldy_0*.json
+#   ./propel.rb '{"lati":34.26645,"loni":-117.62755,"h":10.0,"g":10.0,"w":"hann","dparmax":0.25,"eps":3.0,"skip":10,"bump":1}' baldy/preprocessed/baldy_0*.json
 # First arg is parameters, formatted as a JSON hash.
 # The rest are files giving polygonal approximations to gps tracks. They should
 # contain columns x and y -- maybe z? Can contain other columns.
@@ -23,8 +23,10 @@ require_relative "#{$lib}/system"
 #   dparmax -- unitless; ignore points on a path that differ in estimated parameter by more than this fractional amount
 #   eps -- distance to move in meters at each step
 #   skip -- e.g., if this is 10, then only write every 10th point to the output files
+#   bump -- boolean; if 1, then try to move past points with f=0
+#   verbosity -- 0 to 3
 
-$verbosity = 3
+$verbosity = 0
 
 def main
   params = JSON.parse(ARGV.shift)
@@ -65,6 +67,8 @@ def main
   dparmax = require_param(params,'dparmax')
   eps = require_param(params,'eps')
   skip = require_param(params,'skip')
+  bump = optional_param(params,'bump',0)
+  $verbosity = optional_param(params,'verbosity',3)
   xi,yi,zi = spherical_to_cartesian(lati,loni,0.0,lat0,lon0) # we don't use zi
 
   grid_d = 100.0 # meters; spacing of a square grid used for sorting and searching; value only affects efficiency, not results
@@ -77,7 +81,7 @@ def main
 
   if $verbosity>=3 then print "bounding box: x=#{x_lo},#{x_hi}, y=#{y_lo},#{y_hi}, ngrid=#{ngrid}, lati,loni=#{lati},#{loni} xi,yi=#{xi},#{yi} l=#{l}\n" end
 
-  d,true_path = propel(paths,xi,yi,xi,yi,eps,h,g,w,l,dparmax,box,ngrid,grid_d,grid)
+  d,true_path = propel(paths,xi,yi,xi,yi,eps,h,g,w,l,dparmax,bump,box,ngrid,grid_d,grid)
         # true_path = array of points
         # FIXME -- assumes final point is same as initial
   print "total horizontal distance = #{d/1000.0} km\n"
@@ -123,7 +127,7 @@ def estimate_length(path)
   }
 end
 
-def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,box,ngrid,grid_d,grid)
+def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,bump,box,ngrid,grid_d,grid)
   # l = estimated length of entire path
   p = [xi,yi]
   n = paths.length
@@ -139,6 +143,7 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,box,ngrid,grid_d,grid
     f = [0.0,0.0]
     0.upto(paths.length-1) { |m|
       path = paths[m]
+      if p[0].nan? || p[1].nan? then print "p is nan in propel\n"; exit(-1) end
       r,q,t,ii = closest_point(p,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,most_recent_i[m])
               # r,q,t=distance,point,tangent,index
       if !ii.nil? then most_recent_i[m]=ii end
@@ -148,16 +153,23 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,box,ngrid,grid_d,grid
       t = normalize2d(t)
       # longitudinal propulsive force
       f_lon = scalar_mul2d(t,w)
+      if f_lon[0].nan? || f_lon[1].nan? then print "f_lon is nan in propel\n"; exit(-1) end
       f = add2d(f,f_lon)
       # attractive transverse force
       rhat = normalize2d(sub2d(q,p))
       f_tr = scalar_mul2d(rhat,w*(r/g))
+      if f_tr[0].nan? || f_tr[1].nan? then f_tr=[0.0,0.0] end # happens if r=0
       f = add2d(f,f_tr)
-      if i>3555 && i<3600 then print "m=#{m}, q-p=#{sub2d(q,p)} f_lon=#{f_lon},   f_tr=#{f_tr}\n" end # qwe
     }
+    if f[0].nan? || f[1].nan? then print "f is nan in propel\n"; exit(-1) end
     if mag2d(f)==0.0 then
-      print "propel() terminated with f=0 at d=#{d} meters\n"
-      break
+      if bump!=1 then
+        print "propel() terminated with f=0 at d=#{d} meters\n"
+        break
+      else
+        p = bump(p,paths,most_recent_i)
+        next
+      end
     end
     if d>2.0*l then
       print "propel() terminated due to distance greater than twice the estimated length\n"
@@ -173,15 +185,39 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,box,ngrid,grid_d,grid
       closest_approach_to_finish = d_finish
     end
     f = normalize2d(f)
-    if i>3555 && i<3600 then print "d=#{d},    p=#{p},    f=#{f}, i=#{i}\n" end # qwe
     dp = scalar_mul2d(f,eps)
+    if dp[0].nan? || dp[1].nan? then print "dp is nan in propel\n"; exit(-1) end
     d = d+mag2d(dp)
     p = add2d(p,dp)
     true_path.push(p)
-    print "d=#{d},    p=#{p},    f=#{f}\n" if i%1000==0
+    print "d=#{d},    p=#{p},    f=#{f}\n" if i%1000==0 && $verbosity>=3
+    if true_path.length>=3 && dist2d(true_path[-1],true_path[-3])<0.000001 then
+      # bouncing back and forth between two points, a common behavior
+      if bump!=1 then
+        print "propel() terminated due to bouncing at d=#{d} meters\n"
+      else
+        p = bump(p,paths,most_recent_i)
+      end
+    end
     i=i+1
   end
   return [d,true_path]
+end
+
+# method to get past incorrect stops
+# bump each index by 1, and move path to new average
+def bump(p,paths,most_recent_i)
+  0.upto(most_recent_i.length-1) { |m| most_recent_i[m] = most_recent_i[m]+1 }
+  p = [0.0,0.0]
+  0.upto(paths.length-1) { |m|
+    i = most_recent_i[m]
+    if paths[m][i].nil? then print "propel() terminated with f=0, unable to bump"; break end
+    x = paths[m][i]['p']
+    p = add2d(p,x)
+  }
+  p = scalar_mul2d(p,1.0/paths.length)
+  p = add2d(p,[0.0001,0.0001]) # without this, we get errors because we're not in general position
+  return p
 end
 
 def window(x,window_type)
@@ -191,10 +227,10 @@ def window(x,window_type)
 
   if x>=1.0 || x<=-1.0 then return 0 end
 
-  if w=='square' then
+  if window_type=='square' then
     return 1.0  
   end
-  if w=='hann' then
+  if window_type=='hann' then
     # 2-dimensional rotation of Hann window
     # Some people do an outer product for 2-dim applications, but I want this to be rotationally invariant.
     return 0.5*(1+Math::cos(x*Math::PI))
@@ -207,9 +243,16 @@ def require_param(params,name)
   return x
 end
 
+def optional_param(params,name,default)
+  x = params[name]
+  if x.nil? then return default end
+  return x
+end
+
 # Given a point x, find the nearest point (vertex or interior) on path m.
 # Return [distance,point,tangent].
 def closest_point(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i)
+  if x[0].nan? || x[1].nan? then print "x is nan in closest_point\n"; exit(-1) end
   i,j=point_to_grid(x,box,grid_d)
   min_d = 1.0e10
   best_p = nil
@@ -297,7 +340,14 @@ end
 def point_to_grid(p,box,grid_d)
   x,y = p
   x_lo,x_hi,y_lo,y_hi = box
-  return [((x-x_lo)/grid_d).floor,((y-y_lo)/grid_d).floor]
+  begin
+    result = [((x-x_lo)/grid_d).floor,((y-y_lo)/grid_d).floor]
+  rescue => exception
+    print "error in point_to_grid, x=#{x}, x_lo=#{x_lo}, grid_d=#{grid_d}, y=#{y}, y_lo=#{y_lo}\n"
+    print exception.backtrace
+    exit(-1)
+  end
+  return result
 end
 
 def get_bounding_box(paths)

@@ -248,9 +248,9 @@ def make_profile_csv(hv,cartesian,rescale)
       dv = 0.0
       i=0.0
     end
-    iota = i_to_iota(i)
+    # iota = i_to_iota(i)
     x,y,z = cartesian[k]
-    csv = csv + "#{"%9.2f" % [h*rescale]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh*rescale]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%7.5f" %  [iota]},#{"%9.2f" % [x]},#{"%9.2f" % [y]},#{"%9.2f" % [z]}\n"
+    csv = csv + "#{"%9.2f" % [h*rescale]},#{"%9.2f" % [v]},#{"%7.2f" %  [dh*rescale]},#{"%7.2f" %  [dv]},#{"%7.5f" %  [i]},#{"%9.2f" % [x]},#{"%9.2f" % [y]},#{"%9.2f" % [z]}\n"
     old_h = h
     old_v = v
     first = false
@@ -307,9 +307,6 @@ def integrate_gain_and_energy(hv,rescale)
       # h intervals constant before this point.
       i_sum = i_sum + i*dh
       i_sum_sq = i_sum_sq + i*i*dh
-      iota = i_to_iota(i)
-      iota_sum = iota_sum + iota*dh
-      iota_sum_sq = iota_sum_sq + iota*iota*dh
       dc = dd*$body_mass*minetti(i)
            # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
       c = c+dc
@@ -326,15 +323,12 @@ def integrate_gain_and_energy(hv,rescale)
   n = hv.length-1.0
   h = h_reintegrated # should equal $nominal_h; may differ from hv.last[0]-hv[0][0] if rescale!=1
   i_rms = Math::sqrt(i_sum_sq/h - (i_sum/h)**2)
-  iota_mean = iota_sum/h
-  iota_rms = iota_sum_sq/h - (iota_sum/h)**2
-  iota_rms = Math::sqrt(iota_rms) if iota_rms>0.0
   i_mean = (hv.last[1]-hv[0][1])/h
   i0,c0,c2,b0,b1,b2 = minetti_quadratic_coeffs()
   e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
   cf = (c-h*$body_mass*minetti(0.0))/c
   stats = {'c'=>c,'h'=>h,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
-           'iota_mean'=>iota_mean,'iota_rms'=>iota_rms,'cf'=>cf,'baumel_si'=>baumel_si,'power'=>power,
+           'cf'=>cf,'baumel_si'=>baumel_si,'power'=>power,
            't'=>t}
   return [stats,hv]
 end
