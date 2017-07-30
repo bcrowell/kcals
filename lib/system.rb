@@ -52,7 +52,9 @@ def shell_out_low_level(c,additional_error_info,die_on_error)
   full_command = "#{c} #{redir}"
   ok = system(full_command)
   return [true,''] if ok
-  message = "error on shell command #{full_command}, #{$?}\n#{additional_error_info}"
+  error_info = $?.to_s
+  if error_info=~/exit 127/ then error_info='command not found' end
+  message = "error on shell command #{full_command}, #{error_info}\n#{additional_error_info}"
   if die_on_error then
     fatal_error(message)
   else

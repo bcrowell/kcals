@@ -72,6 +72,10 @@ def main
   bump = optional_param(params,'bump',0)
   prefer_forward = (optional_param(params,'prefer_forward',1)==1)
   $verbosity = optional_param(params,'verbosity',3)
+  if !(params.empty?) then print "unrecognized parameters: #{params.keys}\n"; exit(-1) end
+  $brute_force = false
+  $debug = false
+
   xi,yi,zi = spherical_to_cartesian(lati,loni,0.0,lat0,lon0) # we don't use zi
 
   grid_d = 100.0 # meters; spacing of a square grid used for sorting and searching; value only affects efficiency, not results
@@ -144,14 +148,24 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,bump,box,ngrid,grid_d
   closest_approach_to_finish = 1.0e10
   i=0
   most_recent_i = Array.new(paths.length, 0)
+  print "starting at p=#{p}\n"
   while true
     f = [0.0,0.0]
+    terms = [] # terms in the sum used to compute f; used for debugging
     0.upto(paths.length-1) { |m|
       path = paths[m]
       if p[0].nan? || p[1].nan? then print "p is nan in propel\n"; exit(-1) end
       closest = closest_point(p,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,most_recent_i[m],prefer_forward,h*100.0)
-      r,q,t,ii = closest[0]
+      r,q,t,ii,par_diff = closest[0]
               # r,q,t=distance,point,tangent,index
+      if false && m==0 && ((d>3135.0 && d<3145.0) || d>7364.0) then # qwe
+        #### $brute_force = true
+        $debug = true
+        dd = dist2d(p,q)
+        u = paths[m][ii]
+        v = u['succ']
+        print "d=#{d} m=#{m} par_diff=#{par_diff} p=#{p} q=#{q} seg=#{u['p']}-#{v['p']} closest dist=#{dd}\n"
+      end
       badness = closest[1] # normally 0
       if badness>=2.0  && !(warnings[m].has_key?('badness')) then
         warnings[m]['badness'] = true
@@ -177,11 +191,12 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,bump,box,ngrid,grid_d
       f_tr = scalar_mul2d(rhat,w*(rmag/g)) # should probably project out any comp. parallel to this segment
       if f_tr[0].nan? || f_tr[1].nan? then f_tr=[0.0,0.0] end # happens if r=0
       f = add2d(f,f_tr)
+      terms.push([m,f_lon,f_tr])
     }
     if f[0].nan? || f[1].nan? then print "f is nan in propel\n"; exit(-1) end
     if mag2d(f)==0.0 then
       if bump!=1 then
-        print "propel() terminated with f=0 at d=#{d} meters\n"
+        print "propel() terminated with f=0 at d=#{d} meters, p=#{p}\n"
         break
       else
         fail,p = do_bump(p,paths,most_recent_i,eps)
@@ -213,6 +228,8 @@ def propel(paths,xi,yi,xf,yf,eps,h,g,window_type,l,dparmax,bump,box,ngrid,grid_d
       # bouncing back and forth between two points, a common behavior
       if bump!=1 then
         print "propel() terminated due to bouncing at d=#{d} meters\n"
+        debug_terms(terms)
+        break
       else
         fail,p = do_bump(p,paths,most_recent_i,eps)
         if fail then print "propel terminated, tried to bump past end\n"; break end
@@ -242,6 +259,18 @@ def do_bump(p,paths,most_recent_i,eps)
   return [false,p]
 end
 
+def debug_terms(terms)
+  f = [0.0,0.0]
+  print "terms in f:\n"
+  terms.each { |term|
+    m,f_lon,f_tr = term
+    print "  m=#{m} f_lon=#{f_lon}, f_tr=#{f_tr}\n"
+    f = add2d(f,f_lon)
+    f = add2d(f,f_tr)
+  }
+  print "f=#{f}\n"
+end
+
 def window(x,window_type)
   # Output is in [0,1].
   # Input is meant to be positive, prescaled distance, with [0,1) giving nonzero results.
@@ -262,12 +291,14 @@ end
 def require_param(params,name)
   x = params[name]
   if x.nil? then fatal_error("required parameter #{name} is not present") end
+  params.delete(name)
   return x
 end
 
 def optional_param(params,name,default)
   x = params[name]
   if x.nil? then return default end
+  params.delete(name)
   return x
 end
 
@@ -289,8 +320,8 @@ def closest_point(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,pr
       force_forward = (i_force_forward==1)
       actual_max_par_diff = (i_par_diff==1 ? max_par_diff : 1.0e10)
       candidate = closest_point_low_level(x,m,paths,box,ngrid,grid_d,grid,d,actual_max_par_diff,not_before_i,force_forward)
-      min_d,best_p,best_t,best_i = candidate
-      if min_d<grab_if_closer_than then return [candidate,badness] end
+      min_d,best_p,best_t,best_i,best_par_diff = candidate
+      if min_d<grab_if_closer_than then return [candidate,badness] end # qwe - does this break things?
       badness = badness+Math.log10(min_d/grab_if_closer_than)
               # the log term is guaranteed to be >0
       candidates.push([badness,candidate,i_par_diff,i_force_forward])
@@ -300,7 +331,7 @@ def closest_point(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,pr
   badness = candidates[0][0]
   result = candidates[0][1]
 
-  min_d,best_p,best_t,best_i = result
+  min_d,best_p,best_t,best_i,best_par_diff = result
   if min_d>1.0e6 then
     print "error, closest_point is #{min_d} meters away, prefer_forward=#{prefer_forward}, max_par_diff=#{max_par_diff}\n"
     candidates.each { |a|
@@ -316,18 +347,30 @@ end
 # workhorse routine called by closest_point()
 # we call it up to four times for different combinations of max_par_diff and force_forward
 def closest_point_low_level(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,force_forward)
+  if $brute_force then
+    return closest_point_low_level_brute_force(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,force_forward)
+  else
+    return closest_point_low_level_indexed(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,force_forward)
+  end
+end
+
+def closest_point_low_level_indexed(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,force_forward)
   if x[0].nan? || x[1].nan? then print "x is nan in closest_point\n"; exit(-1) end
   i,j=point_to_grid(x,box,grid_d)
   min_d = 1.0e10
   best_p = nil
   best_t = nil
   best_i = nil
+  best_par_diff = nil
   n_tried = 0
+  debug = $debug && m==0 # qwe
+  if debug then print "--- x=#{x}, i=#{i}, j=#{j} max_par_diff=#{max_par_diff}\n" end
   0.upto(ngrid-1) { |r|
     # trace a 2r x 2r square around grid square i,j
     (-r).upto(r) { |u|
       best = (r-1.0)*grid_d # closest we could get from now on
-      return [min_d,best_p,best_t,best_i] if best>min_d*1.414 # This is the normal exit, but there is another below.
+      if debug && best>min_d*1.414 then print "      --- returning, min_d=#{min_d}, best_par_diff=#{best_par_diff} \n" end
+      return [min_d,best_p,best_t,best_i,best_par_diff] if best>min_d*1.414 # This is the normal exit, but there is another below.
       0.upto(3) { |edge| # top, bottom, right, left
         ii = i
         jj = j
@@ -339,7 +382,8 @@ def closest_point_low_level(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_b
         grid[[ii,jj]].each { |seg|
           mm,v = seg # path mm's segment from vertex v to its successor may cross (ii,jj)
           next if mm!=m
-          next if (v['d']-d).abs>max_par_diff
+          par_diff = (v['d']-d).abs
+          next if par_diff>max_par_diff
           n_tried = n_tried+1
           next if force_forward && v['i']<not_before_i
           dd,p,t = closest_point_on_segment(x,v['p'],v['succ']['p'])
@@ -348,6 +392,7 @@ def closest_point_low_level(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_b
             best_p = p
             best_t = t
             best_i = v['i']
+            best_par_diff = par_diff
           end
         }
       }
@@ -358,7 +403,35 @@ def closest_point_low_level(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_b
     print "  n_tried=#{n_tried}, d=#{d}\n"
     exit(-1)
   end
-  return [min_d,best_p,best_t,best_i] # This is not the normal way we exit.
+  return [min_d,best_p,best_t,best_i,best_par_diff] # This is not the normal way we exit.
+end
+
+def closest_point_low_level_brute_force(x,m,paths,box,ngrid,grid_d,grid,d,max_par_diff,not_before_i,force_forward)
+  i,j=point_to_grid(x,box,grid_d)
+  min_d = 1.0e10
+  best_p = nil
+  best_t = nil
+  best_i = nil
+  best_par_diff = nil
+  0.upto(paths.length-1) { |m|
+    path = paths[m]
+    0.upto(path.length-2) { |n|
+      path[n]['succ'] = path[n+1]
+      v = path[n]
+      p = path[n]['p']
+      q = path[n+1]['p']
+      par_diff = (v['d']-d).abs
+      dd,p,t = closest_point_on_segment(x,v['p'],v['succ']['p'])
+      if dd<min_d then
+        min_d=dd
+        best_p = p
+        best_t = t
+        best_i = v['i']
+        best_par_diff = par_diff
+      end
+    }
+  }
+  return [min_d,best_p,best_t,best_i,best_par_diff] # This is not the normal way we exit.
 end
 
 # Given a point x and a segment pq, find the point on segment pq closest to x.

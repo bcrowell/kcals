@@ -714,7 +714,7 @@ def read_track_through_gpsbabel(format,kml)
   $temp_files.push(temp_kml)
   open(temp_kml,'w') { |f| f.print kml }
   ok,err = shell_out_low_level("gpsbabel -t -i #{format} -f #{temp_kml} -o unicsv -F #{temp_csv}",'',false)
-  if !ok then fatal_error("syntax error on KML input; this usually means you specified the wrong format.\n#{err}") end
+  if !ok then fatal_error("error on input; this usually means the format was not recognized correctly, or gpsbabel was not installed.\n#{err}") end
   return import_csv(temp_csv)
 end
 
