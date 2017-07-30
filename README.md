@@ -178,7 +178,7 @@ apt-get install libjson-ruby gpsbabel
 
 apt-get install libgdal-dev gdal-bin python-gdal python-pip
 
-pip install elevation
+pip install setuptools && pip install elevation
 
 ### CGI
 

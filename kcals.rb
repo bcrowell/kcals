@@ -157,6 +157,7 @@ def get_track(input_file)
     if $stdin.isatty then fatal_error("This program reads a track from standard input in a format such as KML. For documentation, see https://github.com/bcrowell/kcals") end
     data = $stdin.gets(nil) # slurp all of stdin until end of file
   else
+    if !File.exist?(input_file) then fatal_error("Input file #{input_file} does not exist.") end
     data = slurp_file(input_file)
   end
   path = read_track($format,data)
@@ -632,7 +633,7 @@ def add_dem(path,box)
     cache_dir_option = "--cache_dir #{Dir.pwd}"
   end
   shell_out("eio #{cache_dir_option} clip -o #{temp_tif} --bounds #{box} #{redir}",
-            "Information about the errors may be in the files temp*.stdout and temp*.stderr.") 
+            "Information about the errors may be in the files temp*.stdout and temp*.stderr. The command eio is installed by doing pip install setuptools && pip install elevation.") 
           # box is sanitized, because all input have been through .to_f
   shell_out("gdal_translate -of AAIGrid -ot Int32 #{temp_tif} #{temp_aig} #{redir}")
   if !$cgi then
