@@ -130,7 +130,7 @@ begin
   env = ENV.to_hash
   env['CGI'] = '1'
   env['PATH'] = env['PATH']+":"+Dir.pwd
-  stdin, stdout, stderr, wait_thr = Open3.popen3(env,'kcals.rb',args_json)
+  stdin, stdout, stderr, wait_thr = Open3.popen3(env,Dir.pwd+'/kcals.rb',args_json)
   results_json = stdout.gets(nil)
   stdout.close
   error_output = stderr.gets(nil)

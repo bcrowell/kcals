@@ -168,6 +168,19 @@ are both set, then split times will be estimated. Example:
 
 `kcals.rb dem=1 nominal_h=13.11 my_h=13.11 my_t=1:39:21 chino_hills_half_marathon.gpx`
 
+This feature is experimental and should not be trusted too much. It seems to give reasonable answers
+in some cases, but for runs with a lot of very steep climbing it can be wildly off. For example,
+I used my time on a slighly hilly (2% CF) 15.2 mile loop as a reference point, which resulted in a
+power of about 690-780 W (the latter representing my PR pace). With this reference point, I estimated
+the time it would take me to do a 16.7-mile run with a 35% CF (7300' of elevation gain), and the
+prediction was 3.5-4 hours. In reality, the latter run took me almost 7 hours. I think what's going
+on here is that for runs with lots of very steep hills, only a certain fraction of the
+mileage may actually be runnable, so my actual pace is dramatically slower. Even on a downhill,
+it may be difficult to maintain a running pace of the terrain is very steep and has lots of rocks,
+twists and turns, etc. The lab data that kcals is based on was all done using a treadmill, and a
+person on a treadmill can tear down steep grades at speeds they would never be able to manage on
+a trail.
+
 ## Installing
 
 ### Minimal installation
@@ -179,6 +192,15 @@ apt-get install libjson-ruby gpsbabel
 apt-get install libgdal-dev gdal-bin python-gdal python-pip
 
 pip install setuptools && pip install elevation
+
+eio selfcheck
+
+When first installing the software, it seems possible to get the elevation tools into a
+state where they give mysterious error messages, or where incorrect (zero) elevation data
+gets returned. In the latter situation, do an "eio clean." In the former situation,
+try to debug by doing a command that is supposed to work according to the documentation:
+
+eio clip -o Rome-30m-DEM.tif --bounds 12.35 41.8 12.65 42
 
 ### CGI
 
