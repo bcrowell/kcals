@@ -16,7 +16,8 @@ The outputs seem low compared to other estimates I've seen. This may be because 
 elite athletes were very efficient, were not carrying packs or wearing heavy boots, and
 were running on a nice uniform treadmill. I find the data most useful if I want to compare
 one run to another, e.g., if I want to know how a mountain run with lots of elevation gain
-compares with a flat run at a longer distance.
+compares with a flat run at a longer distance, or if I want to project whether doing a certain
+trail as a run is feasible for me.
 
 ## Use through the web interface
 
@@ -96,7 +97,7 @@ Parameters are:
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
-in units of meters. Their defaults values are 60 and 30, respectively. These are meant to get rid of bogus
+in units of meters. Their defaults values are 200 and 30, respectively. These are meant to get rid of bogus
 oscillations in the data. Any elevation (z) changes that occur over horizontal distances less
 than the value of "filtering" will tend to get filtered out, and likewise any horizontal motion that occurs
 over horizontal distances less than the value of "xy_filtering."
@@ -125,6 +126,10 @@ There are several reasons why it may be a good idea to set a fairly large value 
          I have found empirically that setting filtering=60 m is roughly the minimum that is required
          in order to eliminate this type of artifact, which makes sense because a detour into a 30 meter
          gully probably does involve about 60 meters of horizontal travel.
+
+I've experimented with setting the filtering as low as 60 m rather than 200 m, but this seemed to
+produce clear overestimates of the energy expenditure. For example, it showed me routinely putting
+out a higher averaged power on a 2-hour uphill run than on a 1-hour flat run.
 
 The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
 Higher resolution increases the mileage, because small wiggles get counted in. This has a big effect on
