@@ -97,7 +97,7 @@ Parameters are:
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
-in units of meters. Their defaults values are 200 and 30, respectively. These are meant to get rid of bogus
+in units of meters. Their defaults values are 60 and 30, respectively. These are meant to get rid of bogus
 oscillations in the data. Any elevation (z) changes that occur over horizontal distances less
 than the value of "filtering" will tend to get filtered out, and likewise any horizontal motion that occurs
 over horizontal distances less than the value of "xy_filtering."
@@ -127,9 +127,14 @@ There are several reasons why it may be a good idea to set a fairly large value 
          in order to eliminate this type of artifact, which makes sense because a detour into a 30 meter
          gully probably does involve about 60 meters of horizontal travel.
 
-I've experimented with setting the filtering as low as 60 m rather than 200 m, but this seemed to
-produce clear overestimates of the energy expenditure. For example, it showed me routinely putting
-out a higher averaged power on a 2-hour uphill run than on a 1-hour flat run.
+My rules of thumb for setting the filtering are as follows:
+
+ * For most runs with relatively short and not insanely steep hills, the default vertical filtering
+     parameter of 60 m works well. Using a higher filtering value leads to wrong results, because
+     the hills get smoothed out entirely.
+
+ * For very steep runs with a lot of elevation gain, in rugged terrain, it's necessary to use a
+     larger filtering value of about 200 m. Otherwise the energy estimates are much too high.
 
 The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
 Higher resolution increases the mileage, because small wiggles get counted in. This has a big effect on

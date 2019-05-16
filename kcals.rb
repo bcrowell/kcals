@@ -171,7 +171,7 @@ def init_globals
   $metric = false
   $running = true # set to false for walking
   $body_mass = 66 # in kg, =145 lb
-  $osc_h = 200.0 # Filter out variations in elevation that occur on horizontal scales shorter than this
+  $osc_h =  60.0 # Filter out variations in elevation that occur on horizontal scales shorter than this
                  # value, in meters. Calculated gain is very sensitive to this.
                  # See docs for empirics of choosing this.
   $format = 'kml' # see README.md for legal values
