@@ -12,8 +12,8 @@ do DOWNLOAD KML FILE.
 
 The calorie expenditure is calculated from Minetti et al., http://jap.physiology.org/content/93/3/1039.full .
 They got their data from elite mountain runners (all male) running on a treadmill.
-The outputs seem low compared to other estimates I've seen. 
 
+The outputs seem low compared to other estimates I've seen. 
 Part of this is likely to be because elite athletes have better mechanical efficiency;
 measurements have shown that even among elite distance runners, running economy varies
 by as much as 25% (Lucia et al., "The key to top-level endurance running performance: a unique example,"
@@ -21,10 +21,18 @@ DOI 10.1136/bjsm.2007.040725). The average difference between trained and untrai
 was found in one study to be about 8% (Van Dijk, 2017).
 
 In addition, the athletes in Minetti's treadmill study were not carrying packs or wearing heavy boots, and
-were running on a nice uniform treadmill. I find the data most useful if I want to compare
+were running on a nice uniform treadmill.
+
+I find the data most useful if I want to compare
 one run to another, e.g., if I want to know how a mountain run with lots of elevation gain
 compares with a flat run at a longer distance, or if I want to project whether doing a certain
 trail as a run is feasible for me.
+
+All the energy measurements are scaled linearly according to the runner's body
+weight. Apparently this linear scaling has been controversial in the past, but
+it does appear to hold empirically. See
+Shaw et al., "The valid measurement of running economy in runners," 2014,
+Med Sci Sports Exercise, DOI 10.1249/MSS.0000000000000311.
 
 ## Use through the web interface
 
