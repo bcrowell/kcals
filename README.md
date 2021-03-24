@@ -32,7 +32,7 @@ All the energy measurements are scaled linearly according to the runner's body
 weight. Apparently this linear scaling has been controversial in the past, but
 it does appear to hold empirically. See
 Shaw et al., "The valid measurement of running economy in runners," 2014,
-Med Sci Sports Exercise, DOI 10.1249/MSS.0000000000000311.
+Med Sci Sports Exercise.
 
 ## Use through the web interface
 
@@ -210,7 +210,7 @@ a trail.
 
 ### Minimal installation
 
-apt-get install libjson-ruby gpsbabel
+apt-get install gpsbabel
 
 ### To allow downloading of elevation data:
 

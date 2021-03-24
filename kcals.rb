@@ -470,6 +470,8 @@ def do_filter(v0,w)
   if w<n then
     sum = sum_left
     w.upto(n) { |i|
+      if i>=v.length then break end # wasn't part of original algorithm, but needed for some data sets...?
+      if v[i].nil? then fatal_error("coordinate #{i} of #{w}..#{n} is nil, length of vector is #{v.length}, for v0=#{v0.length}, w=#{w}") end
       sum = sum + v[i]-v[i-w]
       j = i-w/2
       break if j>n-w

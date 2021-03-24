@@ -1,0 +1,283 @@
+{"name":"Lucas Matison","time":"58:35","sex":"M","age":"21","bib":"205","address":"Altadena, CA, USA"}
+{"name":"Michael Eastburn","time":"1:01:19","sex":"M","age":"28","bib":"88","address":"Northridge, CA, USA"}
+{"name":"James Timphony","time":"1:01:56","sex":"M","age":"30","bib":"1","address":"Pasadena, CA, USA"}
+{"name":"Dominic Grossman","time":"1:05:36","sex":"M","age":"31","bib":"4","address":"Wrightwood, CA, USA"}
+{"name":"Ben Ward","time":"1:10:20","sex":"M","age":"43","bib":"317","address":"Anchorage, AK, USA"}
+{"name":"Manbir Sandhu","time":"1:12:49","sex":"M","age":"30","bib":"267","address":"Rosemead, CA, USA"}
+{"name":"Austin Hartman","time":"1:13:05","sex":"M","age":"21","bib":"124","address":"Valencia, CA, USA"}
+{"name":"Nick Parazoo","time":"1:13:25","sex":"M","age":"35","bib":"235","address":"Sierra Madre, CA, USA"}
+{"name":"Eric Triplett","time":"1:13:39","sex":"M","age":"44","bib":"305","address":"Monrovia, CA, USA"}
+{"name":"Patrick Hartman","time":"1:14:00","sex":"M","age":"50","bib":"125","address":"Valencia, CA, USA"}
+{"name":"Sean Clark","time":"1:14:30","sex":"M","age":"30","bib":"63","address":"Pasadena, CA, USA"}
+{"name":"Louis Rincavage","time":"1:16:16","sex":"M","age":"29","bib":"254","address":"La Canada, CA, USA"}
+{"name":"Thomas Schumann","time":"1:16:28","sex":"M","age":"53","bib":"272","address":"Santa Monica, CA, USA"}
+{"name":"Jeff Lawler","time":"1:17:00","sex":"M","age":"48","bib":"179","address":"Los Angeles, CA, USA"}
+{"name":"Blake Rankin","time":"1:17:01","sex":"M","age":"34","bib":"249","address":"South Pasadena, CA, USA"}
+{"name":"Steven Losorelli","time":"1:17:08","sex":"M","age":"25","bib":"190","address":"Sierra Madre, CA, USA"}
+{"name":"Mark Mehlert","time":"1:17:24","sex":"M","age":"56","bib":"212","address":"Los Angeles, CA, USA"}
+{"name":"Sean Keane","time":"1:17:42","sex":"M","age":"38","bib":"162","address":"San Diego, CA, USA"}
+{"name":"Andy Rodemich","time":"1:17:49","sex":"M","age":"41","bib":"338","address":"La Canada Flintridge, CA, USA"}
+{"name":"Nicole Judd","time":"1:17:55","sex":"F","age":"30","bib":"159","address":"Temecula, CA, USA"}
+{"name":"Nate Denver","time":"1:18:03","sex":"M","age":"41","bib":"81","address":"Pasadena, CA, USA"}
+{"name":"David Le Pagne","time":"1:18:12","sex":"M","age":"45","bib":"181","address":"Pasadena, CA, USA"}
+{"name":"Brett Nicoletti","time":"1:18:14","sex":"M","age":"43","bib":"226","address":"Pasadena, CA, USA"}
+{"name":"George Juarez","time":"1:18:27","sex":"M","age":"52","bib":"158","address":"Los Angeles, CA, USA"}
+{"name":"Ryan Hogan","time":"1:18:46","sex":"M","age":"39","bib":"135","address":"Oxnard, CA, USA"}
+{"name":"Jeff Allen","time":"1:19:09","sex":"M","age":"","bib":"16","address":"Hemet, CA, USA"}
+{"name":"John Leeper","time":"1:19:19","sex":"M","age":"61","bib":"185","address":"Socorro, NM, USA"}
+{"name":"David Robison","time":"1:19:27","sex":"M","age":"40","bib":"257","address":"Monrovia, CA, USA"}
+{"name":"Lorenzo Rossi","time":"1:19:53","sex":"M","age":"42","bib":"261","address":"Los Angeles, CA, USA"}
+{"name":"Gregory Whiffen","time":"1:20:23","sex":"M","age":"52","bib":"322","address":"Altadena, CA, USA"}
+{"name":"Danny Richman","time":"1:21:14","sex":"M","age":"20","bib":"253","address":"Sierra Madre, CA, USA"}
+{"name":"Erik Jourgensen","time":"1:21:27","sex":"M","age":"30","bib":"157","address":"Los Angeles, CA, USA"}
+{"name":"Matthew Widzer","time":"1:21:33","sex":"M","age":"45","bib":"323","address":"Stanton, CA, USA"}
+{"name":"Paul Masonick","time":"1:21:37","sex":"M","age":"33","bib":"200","address":"Riverside, CA, USA"}
+{"name":"Kevin Walker","time":"1:21:39","sex":"M","age":"40","bib":"316","address":"Altadena, CA, USA"}
+{"name":"Heather Huggins","time":"1:21:40","sex":"F","age":"44","bib":"141","address":"Monrovia, CA, USA"}
+{"name":"Samuel Hitz","time":"1:22:13","sex":"M","age":"46","bib":"132","address":"Sierra Madre, CA, USA"}
+{"name":"Tamar Le","time":"1:23:15","sex":"F","age":"37","bib":"7","address":"Altadena, CA, USA"}
+{"name":"Doug Reed","time":"1:23:50","sex":"M","age":"56","bib":"251","address":"Ojai, CA, USA"}
+{"name":"Ann Marie Cody","time":"1:23:56","sex":"F","age":"36","bib":"65","address":"Sunnyvale, CA, USA"}
+{"name":"Matthew Foster","time":"1:24:13","sex":"M","age":"26","bib":"102","address":"Pasadena, CA, USA"}
+{"name":"Kara Schrum","time":"1:24:21","sex":"F","age":"38","bib":"270","address":"Monrovia, CA, USA"}
+{"name":"Ryan Kroll","time":"1:24:23","sex":"M","age":"38","bib":"173","address":"Portland, OR, USA"}
+{"name":"Kevin Kleinhenz","time":"1:24:24","sex":"M","age":"41","bib":"169","address":"Los Angeles, CA, USA"}
+{"name":"Tim Cadogan","time":"1:24:55","sex":"M","age":"47","bib":"52","address":"Altadena, CA, USA"}
+{"name":"Luke Jones","time":"1:25:02","sex":"M","age":"34","bib":"156","address":"Sierra Madre, CA, USA"}
+{"name":"Tom Starr","time":"1:25:27","sex":"M","age":"55","bib":"282","address":"Newport Beach, CA, USA"}
+{"name":"Lauren Schweitzer","time":"1:25:36","sex":"F","age":"34","bib":"274","address":"Altadena, CA, USA"}
+{"name":"Nick Mastrodemos","time":"1:25:56","sex":"M","age":"53","bib":"201","address":"La Canada, CA, USA"}
+{"name":"Anselmo Loya","time":"1:26:23","sex":"M","age":"38","bib":"191","address":"Sierra Madre, CA, USA"}
+{"name":"Linda Sereno","time":"1:26:26","sex":"F","age":"58","bib":"6","address":"Salinas, CA, USA"}
+{"name":"Pat Wheeler","time":"1:26:48","sex":"M","age":"45","bib":"321","address":"Alta Loma, CA, USA"}
+{"name":"Matt Redondo","time":"1:27:16","sex":"M","age":"27","bib":"250","address":"Arletta, CA, USA"}
+{"name":"Trent Hilton","time":"1:27:48","sex":"M","age":"36","bib":"131","address":"Canyon Country, CA, USA"}
+{"name":"Rodney Evans","time":"1:28:16","sex":"M","age":"49","bib":"95","address":"Altadena, CA, USA"}
+{"name":"Amy Johnston","time":"1:28:24","sex":"F","age":"25","bib":"154","address":"Salinas, CA, USA"}
+{"name":"Gary Inouye","time":"1:28:25","sex":"M","age":"65","bib":"147","address":"Arcadia, CA, USA"}
+{"name":"John Howard","time":"1:28:39","sex":"M","age":"59","bib":"137","address":"Sacramento, CA, USA"}
+{"name":"Samantha Smith","time":"1:28:51","sex":"F","age":"25","bib":"279","address":"Riverside, CA, USA"}
+{"name":"Oscar Rodriguez","time":"1:28:57","sex":"M","age":"44","bib":"259","address":"Los Angeles, CA, USA"}
+{"name":"Albert Allen","time":"1:29:10","sex":"M","age":"34","bib":"15","address":"Whittier, CA, USA"}
+{"name":"Tim Osti","time":"1:29:21","sex":"M","age":"50","bib":"231","address":"Sierra Madre, CA, USA"}
+{"name":"Mark Silk","time":"1:29:22","sex":"M","age":"51","bib":"278","address":"Pasadena, CA, USA"}
+{"name":"Luther Beegle","time":"1:29:37","sex":"M","age":"51","bib":"36","address":"Sierra Madre, CA, USA"}
+{"name":"Amelie Joffrin","time":"1:29:40","sex":"F","age":"26","bib":"152","address":"Pasadena, CA, USA"}
+{"name":"Garth Ramsey","time":"1:29:51","sex":"M","age":"49","bib":"248","address":"Sierra Madre, CA, USA"}
+{"name":"Richard Carney","time":"1:29:55","sex":"M","age":"53","bib":"57","address":"Arcadia, CA, USA"}
+{"name":"Patrick Thomas","time":"1:30:29","sex":"M","age":"27","bib":"298","address":"Arcadia, CA, USA"}
+{"name":"Jackson Mcglasson","time":"1:31:12","sex":"M","age":"18","bib":"207","address":"Sierra Madre, CA, USA"}
+{"name":"Jake Armstrong","time":"1:31:12","sex":"M","age":"34","bib":"28","address":"Los Angeles, CA, USA"}
+{"name":"Carlos Berdejo","time":"1:31:18","sex":"M","age":"41","bib":"39","address":"Sierra Madre, CA, USA"}
+{"name":"Anna Hoyer","time":"1:31:21","sex":"F","age":"29","bib":"139","address":"Redondo Beach, CA, USA"}
+{"name":"Tracy Sullivan","time":"1:31:30","sex":"F","age":"26","bib":"287","address":"Sierra Madre, CA, USA"}
+{"name":"Thomas Bigley","time":"1:31:38","sex":"M","age":"56","bib":"40","address":"Bradbury, CA, USA"}
+{"name":"Doug Salter","time":"1:31:41","sex":"M","age":"53","bib":"265","address":"La Canada, CA, USA"}
+{"name":"Jason Wurst","time":"1:31:50","sex":"M","age":"28","bib":"333","address":"Burbank, CA, USA"}
+{"name":"Jeffrey Schneider","time":"1:32:01","sex":"M","age":"31","bib":"268","address":"Monrovia, CA, USA"}
+{"name":"Steven Argue","time":"1:32:05","sex":"M","age":"","bib":"26","address":"Altadena, CA, USA"}
+{"name":"Heather Mackey","time":"1:32:46","sex":"F","age":"30","bib":"194","address":"Monrovia, CA, USA"}
+{"name":"Luke De Kansky","time":"1:32:55","sex":"M","age":"50","bib":"79","address":"Sierra Madre, CA, USA"}
+{"name":"Eric Burt","time":"1:33:25","sex":"M","age":"61","bib":"50","address":"Sierra Madre, CA, USA"}
+{"name":"Devin Mcphillips","time":"1:33:25","sex":"M","age":"36","bib":"210","address":"Sierra Madre, CA, USA"}
+{"name":"Sarah Syed","time":"1:33:52","sex":"F","age":"37","bib":"289","address":"CA, USA"}
+{"name":"Jill Henry","time":"1:34:15","sex":"F","age":"32","bib":"127","address":"Los Angeles, CA, USA"}
+{"name":"Stephen Terni","time":"1:34:15","sex":"M","age":"40","bib":"296","address":"Monrovia, CA, USA"}
+{"name":"Mukesh Mehra","time":"1:34:29","sex":"M","age":"41","bib":"213","address":"Sierra Madre, CA, USA"}
+{"name":"David Adams","time":"1:34:33","sex":"M","age":"57","bib":"11","address":"Park City, CA, USA"}
+{"name":"Josh Kenin","time":"1:34:41","sex":"M","age":"45","bib":"165","address":"Santa Monica, CA, USA"}
+{"name":"David Chebuske","time":"1:34:54","sex":"M","age":"33","bib":"60","address":"Sierra Madre, CA, USA"}
+{"name":"Duncan Hardy","time":"1:35:16","sex":"M","age":"19","bib":"122","address":"Carmel, IN, USA"}
+{"name":"James Faulkner","time":"1:35:22","sex":"M","age":"60","bib":"9","address":"Pasadena, CA, USA"}
+{"name":"Mauro Guerrero","time":"1:35:25","sex":"M","age":"48","bib":"114","address":"San Dimas, CA, USA"}
+{"name":"Kong Tan","time":"1:35:27","sex":"M","age":"44","bib":"293","address":"Rosemead, CA, USA"}
+{"name":"Michael Pacheco","time":"1:35:30","sex":"M","age":"54","bib":"232","address":"Los Angeles, CA, USA"}
+{"name":"Ryan Malloy","time":"1:35:34","sex":"M","age":"27","bib":"197","address":"Monrovia, CA, USA"}
+{"name":"David Pejsa","time":"1:35:47","sex":"M","age":"46","bib":"237","address":"Sierra Madre, CA, USA"}
+{"name":"Robert Herrera","time":"1:35:59","sex":"M","age":"41","bib":"130","address":"El Monte, CA, USA"}
+{"name":"Dario Pirozko","time":"1:36:01","sex":"M","age":"47","bib":"242","address":"Sierra Madre, CA, USA"}
+{"name":"Kevin Jones","time":"1:36:05","sex":"M","age":"44","bib":"155","address":"San Gabriel, CA, USA"}
+{"name":"Robert Bischoff","time":"1:36:21","sex":"M","age":"39","bib":"43","address":"Sierra Madre, CA, USA"}
+{"name":"Michael Keeler","time":"1:36:29","sex":"M","age":"31","bib":"163","address":"Sierra Madre, CA, USA"}
+{"name":"Peter Foley","time":"1:36:33","sex":"M","age":"33","bib":"100","address":"Pasadena, CA, USA"}
+{"name":"Rodney Leard","time":"1:36:35","sex":"M","age":"54","bib":"182","address":"Agoura, CA, USA"}
+{"name":"James Flanigan","time":"1:36:39","sex":"M","age":"68","bib":"96","address":"Pacific Palisades, CA, USA"}
+{"name":"Agustin Jimenez","time":"1:36:44","sex":"M","age":"35","bib":"151","address":"Arcadia, CA, USA"}
+{"name":"Tim Mosa","time":"1:36:48","sex":"M","age":"47","bib":"218","address":"Seal Beach, CA, USA"}
+{"name":"Jill Liston","time":"1:36:54","sex":"F","age":"55","bib":"8","address":"Sierra Madre, CA, USA"}
+{"name":"Jeff Hulett","time":"1:37:18","sex":"M","age":"57","bib":"143","address":"Encinitas, CA, USA"}
+{"name":"Juanita Vega","time":"1:37:23","sex":"F","age":"44","bib":"314","address":"Monrovia, CA, USA"}
+{"name":"Leanne Meadows","time":"1:37:44","sex":"F","age":"56","bib":"211","address":"Reno, NV, USA"}
+{"name":"Dustin Schones","time":"1:37:48","sex":"M","age":"38","bib":"269","address":"Monrovia, CA, USA"}
+{"name":"William Gardner","time":"1:37:57","sex":"M","age":"49","bib":"107","address":"Sierra Madre, CA, USA"}
+{"name":"Patrick Rini","time":"1:38:02","sex":"M","age":"58","bib":"255","address":"Arcadia, CA, USA"}
+{"name":"Doug Erickson","time":"1:38:02","sex":"M","age":"38","bib":"90","address":"Orange, CA, USA"}
+{"name":"Doug Thomas","time":"1:38:10","sex":"M","age":"31","bib":"297","address":"Pasadena, CA, USA"}
+{"name":"Vincent De Marzo","time":"1:38:14","sex":"M","age":"65","bib":"80","address":"Sierra Madre, CA, USA"}
+{"name":"Dene Schulze-Alva","time":"1:38:17","sex":"F","age":"42","bib":"271","address":"Sierra Madre, CA, USA"}
+{"name":"Matthew Tiffany","time":"1:38:30","sex":"M","age":"36","bib":"302","address":"Pasadena, CA, USA"}
+{"name":"Monya Moyer","time":"1:38:34","sex":"F","age":"41","bib":"334","address":"Monrovia, CA, USA"}
+{"name":"Ryan Hagen","time":"1:38:47","sex":"M","age":"41","bib":"119","address":"Sierra Madre, CA, USA"}
+{"name":"J. Gutierrez","time":"1:39:04","sex":"M","age":"41","bib":"115","address":"Sierra Madre, CA, USA"}
+{"name":"Robert Okeefe","time":"1:39:05","sex":"M","age":"59","bib":"229","address":"Monrovia, CA, USA"}
+{"name":"David Mclean","time":"1:39:36","sex":"M","age":"56","bib":"209","address":"West Hills, CA, USA"}
+{"name":"Jon Teran","time":"1:39:40","sex":"M","age":"44","bib":"295","address":"Sierra Madre, CA, USA"}
+{"name":"Nathan Rodriguez","time":"1:39:43","sex":"M","age":"43","bib":"258","address":"Temple City, CA, USA"}
+{"name":"Stephen Chapman","time":"1:39:45","sex":"M","age":"39","bib":"59","address":"Pasadena, CA, USA"}
+{"name":"Cecilia Hamilton","time":"1:39:51","sex":"F","age":"45","bib":"120","address":"San Pedro, CA, USA"}
+{"name":"Florence Kerns","time":"1:39:57","sex":"F","age":"27","bib":"167","address":"Sierra Madre, CA, USA"}
+{"name":"Vittorio Miranda","time":"1:40:06","sex":"M","age":"58","bib":"215","address":"Sierra Madre, CA, USA"}
+{"name":"Daniel Sulzinger","time":"1:40:29","sex":"M","age":"31","bib":"288","address":"Fort Riley, KS, USA"}
+{"name":"Steven Agundez","time":"1:40:36","sex":"M","age":"28","bib":"13","address":"Los Angeles, CA, USA"}
+{"name":"Tim Peters","time":"1:40:54","sex":"NOT SPECIFIED","age":"49","bib":"240","address":"Monrovia, CA, USA"}
+{"name":"Thomas Hardy","time":"1:40:57","sex":"M","age":"54","bib":"123","address":"CA, USA"}
+{"name":"Jonathan Bultema","time":"1:41:08","sex":"M","age":"59","bib":"49","address":"Pasadena, CA, USA"}
+{"name":"Beth Teran","time":"1:41:16","sex":"F","age":"44","bib":"294","address":"Sierra Madre, CA, USA"}
+{"name":"Eric Murga","time":"1:41:17","sex":"M","age":"47","bib":"220","address":"Altadena, CA, USA"}
+{"name":"Richard Baker","time":"1:41:18","sex":"M","age":"51","bib":"32","address":"Westlake Village, CA, USA"}
+{"name":"Ted Lubeshkoff","time":"1:41:50","sex":"M","age":"58","bib":"193","address":"Duarte, CA, USA"}
+{"name":"Megan Hogerheiden","time":"1:42:29","sex":"F","age":"37","bib":"136","address":"La Verne, CA, USA"}
+{"name":"Sarah Penalora","time":"1:42:35","sex":"F","age":"51","bib":"238","address":"Sierra Madre, CA, USA"}
+{"name":"Jack Graham","time":"1:42:38","sex":"M","age":"19","bib":"111","address":"Sierra Madre, CA, USA"}
+{"name":"Daniel Altruz","time":"1:42:48","sex":"M","age":"45","bib":"17","address":"Sierra Madre, CA, USA"}
+{"name":"Tony Donagrechia","time":"1:42:52","sex":"M","age":"61","bib":"85","address":"Redondo Beach, CA, USA"}
+{"name":"Simon Brown","time":"1:43:14","sex":"M","age":"42","bib":"48","address":"Altadena, CA, USA"}
+{"name":"Alan Cabral","time":"1:43:32","sex":"M","age":"58","bib":"51","address":"Woodland Hills, CA, USA"}
+{"name":"Edward Hughes","time":"1:43:46","sex":"NOT SPECIFIED","age":"55","bib":"142","address":"Burbank, CA, USA"}
+{"name":"Jennifer Elftman","time":"1:43:50","sex":"F","age":"43","bib":"89","address":"La Verne, CA, USA"}
+{"name":"Melissa Conrad","time":"1:44:00","sex":"F","age":"32","bib":"69","address":"La Verne, CA, USA"}
+{"name":"Craig Arakaki","time":"1:44:01","sex":"M","age":"58","bib":"24","address":"Arcadia, CA, USA"}
+{"name":"Matthew Evans","time":"1:44:05","sex":"M","age":"52","bib":"94","address":"Pasadena, CA, USA"}
+{"name":"Paul Kyllo","time":"1:44:11","sex":"M","age":"53","bib":"175","address":"Glendale, CA, USA"}
+{"name":"Stephen Tuttle","time":"1:44:17","sex":"M","age":"59","bib":"310","address":"Sierra Madre, CA, USA"}
+{"name":"Jeff Nuzzi","time":"1:44:31","sex":"M","age":"54","bib":"227","address":"Pasadena, CA, USA"}
+{"name":"Marianne Siberell","time":"1:44:39","sex":"F","age":"55","bib":"339","address":"Sierra Madre, CA, USA"}
+{"name":"Chris Peplow","time":"1:44:40","sex":"M","age":"54","bib":"239","address":"Glendale, CA, USA"}
+{"name":"Ramon Navarro","time":"1:44:42","sex":"M","age":"43","bib":"223","address":"Sierra Madre, CA, USA"}
+{"name":"Dan Richman","time":"1:45:05","sex":"M","age":"55","bib":"252","address":"Sierra Madre, CA, USA"}
+{"name":"Colin Juett","time":"1:45:06","sex":"M","age":"15","bib":"160","address":"Sierra Madre, CA, USA"}
+{"name":"Todd Frantz","time":"1:45:39","sex":"M","age":"50","bib":"103","address":"Monrovia, CA, USA"}
+{"name":"Andrew Tu","time":"1:45:42","sex":"M","age":"44","bib":"307","address":"Monrovia, CA, USA"}
+{"name":"Timothy Stratz","time":"1:45:58","sex":"M","age":"52","bib":"285","address":"La Canada, CA, USA"}
+{"name":"Billy Connolly","time":"1:46:12","sex":"M","age":"60","bib":"68","address":"Monrovia, CA, USA"}
+{"name":"Bettina Beck","time":"1:46:24","sex":"F","age":"32","bib":"35","address":"Riverside, CA, USA"}
+{"name":"Scott Mcglasson","time":"1:46:34","sex":"M","age":"54","bib":"208","address":"Sierra Madre, CA, USA"}
+{"name":"Albert Vergara","time":"1:47:03","sex":"M","age":"54","bib":"315","address":"Monrovia, CA, USA"}
+{"name":"Lauren Capoccia","time":"1:47:03","sex":"F","age":"34","bib":"55","address":"South Pasadena, CA, USA"}
+{"name":"Erik Peterson","time":"1:47:17","sex":"M","age":"57","bib":"241","address":"Arcadia, CA, USA"}
+{"name":"Michael Sanchez","time":"1:47:23","sex":"M","age":"56","bib":"266","address":"La Verne, CA, USA"}
+{"name":"Ryan Howes","time":"1:47:31","sex":"M","age":"46","bib":"138","address":"Arcadia, CA, USA"}
+{"name":"Kevin Chen","time":"1:47:37","sex":"M","age":"57","bib":"61","address":"Claremont, CA, USA"}
+{"name":"Brian Bolster","time":"1:47:45","sex":"M","age":"44","bib":"45","address":"Pasadena, CA, USA"}
+{"name":"Paul Netherton","time":"1:47:45","sex":"M","age":"48","bib":"225","address":"Pasadena, CA, USA"}
+{"name":"Lucelia Sagrilo","time":"1:48:03","sex":"F","age":"43","bib":"264","address":"Torrance, CA, USA"}
+{"name":"Rob Florkowski","time":"1:48:21","sex":"M","age":"32","bib":"98","address":"Sacramento, CA, USA"}
+{"name":"Henry Yoon","time":"1:48:52","sex":"M","age":"43","bib":"329","address":"Sierra Madre, CA, USA"}
+{"name":"Byron Melendy","time":"1:49:08","sex":"M","age":"76","bib":"214","address":"La Crescenta, CA, USA"}
+{"name":"Walter Hodgson","time":"1:49:17","sex":"M","age":"52","bib":"134","address":"Sierra Madre, CA, USA"}
+{"name":"Mark Lamb","time":"1:49:19","sex":"M","age":"50","bib":"177","address":"Sierra Madre, CA, USA"}
+{"name":"Ken Provanca","time":"1:49:33","sex":"M","age":"56","bib":"245","address":"Soquel, CA, USA"}
+{"name":"David Conway","time":"1:49:48","sex":"M","age":"60","bib":"70","address":"Monrovia, CA, USA"}
+{"name":"Fabian Garcia","time":"1:50:22","sex":"M","age":"37","bib":"106","address":"Whittier, CA, USA"}
+{"name":"Peter Le","time":"1:50:39","sex":"M","age":"45","bib":"180","address":"Pasadena, CA, USA"}
+{"name":"Heather Carmichael","time":"1:50:40","sex":"F","age":"50","bib":"56","address":"Los Angeles, CA, USA"}
+{"name":"Beth Collins","time":"1:50:43","sex":"F","age":"59","bib":"66","address":"Arcadia, CA, USA"}
+{"name":"Shea Clayton","time":"1:50:44","sex":"M","age":"46","bib":"64","address":"Sierra Madre, CA, USA"}
+{"name":"Daisy Boyer","time":"1:51:02","sex":"F","age":"31","bib":"47","address":"Upland, CA, USA"}
+{"name":"Leandra Soop","time":"1:51:14","sex":"F","age":"31","bib":"280","address":"Monrovia, CA, USA"}
+{"name":"Harriet Ward","time":"1:51:54","sex":"M","age":"29","bib":"318","address":"Sherman Oaks, CA, USA"}
+{"name":"Rande Sotomayor","time":"1:52:42","sex":"F","age":"59","bib":"281","address":"Altadena, CA, USA"}
+{"name":"Lourdes Pacilio","time":"1:52:43","sex":"F","age":"58","bib":"233","address":"San Gabriel, CA, USA"}
+{"name":"Armando Uranga","time":"1:53:09","sex":"M","age":"37","bib":"311","address":"Sierra Madre, CA, USA"}
+{"name":"Bobby Leary","time":"1:53:32","sex":"M","age":"37","bib":"183","address":"Sierra Madre, CA, USA"}
+{"name":"Armen Zarian","time":"1:53:40","sex":"F","age":"35","bib":"332","address":"La Crescenta, CA, USA"}
+{"name":"Vahe Akopian","time":"1:53:41","sex":"M","age":"35","bib":"14","address":"Pasadena, CA, USA"}
+{"name":"Daniel Sullivan","time":"1:54:59","sex":"M","age":"58","bib":"286","address":"Sierra Madre, CA, USA"}
+{"name":"Colleen Hamman","time":"1:55:18","sex":"F","age":"60","bib":"121","address":"Pasadena, CA, USA"}
+{"name":"Wenin Ho","time":"1:55:33","sex":"F","age":"33","bib":"133","address":"Torrance, CA, USA"}
+{"name":"James Wynne","time":"1:55:40","sex":"M","age":"55","bib":"327","address":"Sierra Madre, CA, USA"}
+{"name":"Pete Siberell","time":"1:55:42","sex":"M","age":"60","bib":"277","address":"Sierra Madre, CA, USA"}
+{"name":"Stuart Stephens","time":"1:55:53","sex":"M","age":"58","bib":"284","address":"Sierra Madre, CA, USA"}
+{"name":"Charles Koppany","time":"1:55:54","sex":"M","age":"76","bib":"171","address":"Alhambra, CA, USA"}
+{"name":"Monica Talavera","time":"1:55:55","sex":"F","age":"30","bib":"290","address":"La Puente, CA, USA"}
+{"name":"Caroline Lai","time":"1:56:12","sex":"F","age":"34","bib":"176","address":"Sierra Madre, CA, USA"}
+{"name":"Joanna Hernandez","time":"1:56:13","sex":"F","age":"36","bib":"129","address":"Sierra Madre, CA, USA"}
+{"name":"Ruth Jackson","time":"1:56:23","sex":"F","age":"52","bib":"148","address":"Redondo Beach, CA, USA"}
+{"name":"Lisa Mosa","time":"1:56:45","sex":"F","age":"49","bib":"217","address":"Seal Beach, CA, USA"}
+{"name":"Gilbert Sanchez","time":"1:57:21","sex":"M","age":"57","bib":"340","address":"Los Angeles, CA, USA"}
+{"name":"Darren Parker","time":"1:57:53","sex":"M","age":"41","bib":"236","address":"Cardiff, CA, USA"}
+{"name":"Victor Magalhaes","time":"1:57:53","sex":"M","age":"54","bib":"195","address":"Cardiff, CA, USA"}
+{"name":"Hangyee Wong","time":"1:58:14","sex":"F","age":"39","bib":"326","address":"Monrovia, CA, USA"}
+{"name":"Vanc Thomas","time":"1:58:35","sex":"M","age":"65","bib":"299","address":"Azusa, CA, USA"}
+{"name":"Melissa Leary","time":"1:58:41","sex":"F","age":"37","bib":"184","address":"Sierra Madre, CA, USA"}
+{"name":"Corina Casco","time":"1:58:47","sex":"F","age":"41","bib":"58","address":"Santa Monica, CA, USA"}
+{"name":"Helen Foley","time":"1:59:11","sex":"F","age":"30","bib":"99","address":"Pasadena, CA, USA"}
+{"name":"John Uribe","time":"1:59:12","sex":"M","age":"54","bib":"312","address":"Los Angeles, CA, USA"}
+{"name":"Chris Lindell","time":"1:59:22","sex":"M","age":"44","bib":"186","address":"Sierra Madre, CA, USA"}
+{"name":"Yolanda David","time":"1:59:35","sex":"F","age":"51","bib":"77","address":"Torrance, CA, USA"}
+{"name":"Simon Waters","time":"1:59:37","sex":"M","age":"48","bib":"319","address":"Altadena, CA, USA"}
+{"name":"Todd Dubester","time":"1:59:38","sex":"M","age":"43","bib":"87","address":"Altadena, CA, USA"}
+{"name":"Dan Kelley","time":"1:59:52","sex":"M","age":"56","bib":"164","address":"Covina, CA, USA"}
+{"name":"Andrew Binns","time":"2:00:41","sex":"M","age":"46","bib":"42","address":"Sierra Madre, CA, USA"}
+{"name":"Kevin Cooper","time":"2:00:59","sex":"M","age":"31","bib":"71","address":"Newhall, CA, USA"}
+{"name":"Andrew Fritts","time":"2:01:14","sex":"M","age":"40","bib":"105","address":"Monrovia, CA, USA"}
+{"name":"Jungok Ha","time":"2:01:21","sex":"F","age":"41","bib":"118","address":"Redondo Beach, CA, USA"}
+{"name":"Mauro Guerrero","time":"2:01:22","sex":"M","age":"46","bib":"113","address":"Gardena, CA, USA"}
+{"name":"Guisela Calderon","time":"2:01:47","sex":"F","age":"39","bib":"53","address":"West Covina, CA, USA"}
+{"name":"Alan Mcdaniel","time":"2:01:54","sex":"M","age":"50","bib":"206","address":"San Gabriel, CA, USA"}
+{"name":"Diana Andrade","time":"2:02:02","sex":"F","age":"34","bib":"20","address":"Pasadena, CA, USA"}
+{"name":"Ray Guzman","time":"2:02:51","sex":"M","age":"65","bib":"117","address":"Sierra Madre, CA, USA"}
+{"name":"Keely Totten","time":"2:03:02","sex":"F","age":"39","bib":"304","address":"Sierra Madre, CA, USA"}
+{"name":"Aubrey Thornton","time":"2:03:18","sex":"F","age":"45","bib":"301","address":"Pasadena, CA, USA"}
+{"name":"Michael Murphy","time":"2:03:20","sex":"M","age":"51","bib":"221","address":"Sierra Madre, CA, USA"}
+{"name":"Gerald Goblirsch","time":"2:04:12","sex":"M","age":"58","bib":"109","address":"Monrovia, CA, USA"}
+{"name":"Makenna Provanca","time":"2:05:36","sex":"F","age":"20","bib":"246","address":"San Diego, CA, USA"}
+{"name":"Melissa Tampus","time":"2:06:39","sex":"F","age":"34","bib":"292","address":"Valencia, CA, USA"}
+{"name":"Leslie Freiberger","time":"2:06:52","sex":"F","age":"60","bib":"104","address":"Sierra Madre, CA, USA"}
+{"name":"Karen Moran","time":"2:06:52","sex":"F","age":"46","bib":"216","address":"Sierra Madre, CA, USA"}
+{"name":"Hourig Kalajian","time":"2:07:03","sex":"F","age":"32","bib":"161","address":"Arcadia, CA, USA"}
+{"name":"Araceli Martinez","time":"2:07:26","sex":"F","age":"42","bib":"199","address":"San Dimas, CA, USA"}
+{"name":"Ellen Mathews","time":"2:08:03","sex":"F","age":"55","bib":"202","address":"Sierra Madre, CA, USA"}
+{"name":"Ralph West","time":"2:08:37","sex":"M","age":"65","bib":"320","address":"Sierra Madre, CA, USA"}
+{"name":"Joe Cordova","time":"2:08:44","sex":"M","age":"69","bib":"72","address":"La Peunte, CA, USA"}
+{"name":"Coriena Baer","time":"2:08:55","sex":"F","age":"56","bib":"31","address":"Sierra Madre, CA, USA"}
+{"name":"Salvador Esparza","time":"2:09:04","sex":"M","age":"49","bib":"92","address":"Los Angeles, CA, USA"}
+{"name":"Michael Stein","time":"2:12:22","sex":"M","age":"47","bib":"283","address":"Ladera Ranch, CA, USA"}
+{"name":"Denysse Malfavon","time":"2:12:38","sex":"F","age":"37","bib":"196","address":"West Covina, CA, USA"}
+{"name":"Randall Yang","time":"2:12:47","sex":"F","age":"53","bib":"328","address":"Pasadena, CA, USA"}
+{"name":"David Aguilar","time":"2:14:18","sex":"M","age":"46","bib":"12","address":"Sylmar, CA, USA"}
+{"name":"Freddy Guzman","time":"2:16:14","sex":"M","age":"48","bib":"116","address":"Sierra Madre, CA, USA"}
+{"name":"Melissa Provanca","time":"2:17:10","sex":"F","age":"20","bib":"247","address":"Pomona, CA, USA"}
+{"name":"Kelly Kriebs","time":"2:17:35","sex":"F","age":"45","bib":"172","address":"Sierra Madre, CA, USA"}
+{"name":"Lisa Beier","time":"2:17:40","sex":"F","age":"51","bib":"37","address":"Monrovia, CA, USA"}
+{"name":"Kenneth Hubbert","time":"2:18:18","sex":"M","age":"69","bib":"140","address":"Piedmont, CA, USA"}
+{"name":"Robert Talbott","time":"2:18:38","sex":"M","age":"64","bib":"291","address":"Monrovia, CA, USA"}
+{"name":"Nancy Tinker","time":"2:19:17","sex":"F","age":"66","bib":"303","address":"Monrovia, CA, USA"}
+{"name":"Martin Amundson","time":"2:19:48","sex":"M","age":"53","bib":"19","address":"Arcadia, CA, USA"}
+{"name":"Pat Luangeaktrakul","time":"2:20:46","sex":"M","age":"48","bib":"192","address":"Pasadena, CA, USA"}
+{"name":"Yuthana Kong","time":"2:21:00","sex":"F","age":"47","bib":"170","address":"Bellflower, CA, USA"}
+{"name":"Paul Alva","time":"2:22:02","sex":"M","age":"48","bib":"18","address":"Sierra Madre, CA, USA"}
+{"name":"Bob Spears","time":"2:23:25","sex":"M","age":"69","bib":"41","address":"Sierra Madre, CA, USA"}
+{"name":"Merrianne Etter","time":"2:25:34","sex":"F","age":"53","bib":"93","address":"Altadena, CA, USA"}
+{"name":"Hal Chiasson","time":"2:25:42","sex":"M","age":"75","bib":"62","address":"Sierra Madre, CA, USA"}
+{"name":"Emma Mathewson","time":"2:27:53","sex":"F","age":"14","bib":"203","address":"Arcadia, CA, USA"}
+{"name":"John Mathewson","time":"2:27:53","sex":"M","age":"49","bib":"204","address":"Arcadia, CA, USA"}
+{"name":"Christiane Rivard","time":"2:28:41","sex":"F","age":"45","bib":"256","address":"Sierra Madre, CA, USA"}
+{"name":"Sally Andrade","time":"2:30:06","sex":"F","age":"53","bib":"21","address":"Manhattan Beach, CA, USA"}
+{"name":"Aaron Zambrano","time":"2:32:33","sex":"M","age":"22","bib":"330","address":"Sierra Madre, CA, USA"}
+{"name":"Dick Johnson","time":"2:32:41","sex":"M","age":"81","bib":"153","address":"Arcadia, CA, USA"}
+{"name":"Lorraine Shea","time":"2:33:08","sex":"F","age":"54","bib":"275","address":"Harbor City, CA, USA"}
+{"name":"Audrey King","time":"2:37:46","sex":"F","age":"54","bib":"168","address":"Brea, CA, USA"}
+{"name":"Priscilla Lopez","time":"2:39:17","sex":"F","age":"28","bib":"189","address":"Sierra Madre, CA, USA"}
+{"name":"Azar Dabiri","time":"2:42:23","sex":"F","age":"60","bib":"76","address":"Arcadia, CA, USA"}
+{"name":"Kellie Loera","time":"2:42:25","sex":"F","age":"47","bib":"188","address":"Sierra Madre, CA, USA"}
+{"name":"Mark Ryne","time":"2:45:01","sex":"M","age":"63","bib":"263","address":"La Crescenta, CA, USA"}
+{"name":"Colleen Provanca","time":"2:45:03","sex":"F","age":"51","bib":"244","address":"Soquel, CA, USA"}
+{"name":"Lee Willard","time":"2:51:20","sex":"M","age":"82","bib":"325","address":"Whittier, CA, USA"}
+{"name":"Kristen Annes","time":"3:02:14","sex":"F","age":"45","bib":"335","address":"Sierra Madre, CA, USA"}
+{"name":"Elizabeth Iko","time":"3:02:15","sex":"F","age":"54","bib":"146","address":"Sierra Madre, CA, USA"}
+{"name":"Bill Dickey","time":"3:09:17","sex":"M","age":"78","bib":"82","address":"Arcadia, CA, USA"}
+{"name":"Zachary Adam Zambrano","time":"3:11:34","sex":"M","age":"14","bib":"331","address":"Sierra Madre, CA, USA"}
+{"name":"Michael Jakowec","time":"3:33:25","sex":"M","age":"57","bib":"149","address":"Monrovia, CA, USA"}
+{"name":"Nicolaus Jakowec","time":"3:33:25","sex":"M","age":"20","bib":"150","address":"Monrovia, CA, USA"}
+{"name":"Thomas Blum","time":"3:48:46","sex":"M","age":"80","bib":"44","address":"Pasadena, CA, USA"}
