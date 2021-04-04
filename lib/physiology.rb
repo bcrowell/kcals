@@ -5,12 +5,19 @@
 # For the cr and cw functions, see Minetti, http://jap.physiology.org/content/93/3/1039.full
 
 def minetti(i)
+  # cost of running or walking, in J/kg.m
   if $running then
     a,b,c,d,p = [26.073730183424228, 0.031038121935618928, 1.3809948743424785, -0.06547207947176657, 2.181405714691871]
   else
     a,b,c,d,p = [22.911633035337864, 0.02621471025436344, 1.3154310892336223, -0.08317260964525384, 2.208584834633906]
   end
-  return (a*((i**p+b)**(1/p)+i/c+d)).abs
+  cost = (a*((i**p+b)**(1/p)+i/c+d)).abs
+  if $minetti_r==1 then
+    # "recreational" version
+    cutoff_i = -0.03
+    if i<cutoff_i then cost=[cost,minetti(cutoff_i)].max end
+  end
+  return cost
 end
 # Five-parameter fit to the following data:
 #   c is minimized at imin, and has the correct value cmin there (see comments in i_to_iota())

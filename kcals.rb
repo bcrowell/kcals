@@ -104,6 +104,7 @@ def print_stats(stats,hv,rescale)
   eq_kcals = e_q*0.000239006
   if $verbosity>=2 then
     print "units=#{$metric ? "metric" : "US"}, #{$running ? "running" : "walking"}, weight=#{$body_mass} kg, filtering=#{$osc_h} m, format=#{$format}\n"
+    if $minetti_r!=1 then print "Minetti function is set to original rather than 'recreational' version; in most cases this will produce unrealistically optimistic results.\n" end
   end
   if $verbosity>0 then
     print "horizontal distance = #{"%.2f" % [h]} #{h_unit}\n"
@@ -170,6 +171,7 @@ def init_globals
 
   $metric = false
   $running = true # set to false for walking
+  $minetti_r = 1 # set to 1 for "recreational" value of parameters
   $body_mass = 66 # in kg, =145 lb
   $osc_h =  60.0 # Filter out variations in elevation that occur on horizontal scales shorter than this
                  # value, in meters. Calculated gain is very sensitive to this.
@@ -796,6 +798,7 @@ def set_param(par,value,where,s)
   recognized = false
   if par=='metric' then recognized=true; $metric=(value.to_i==1) end
   if par=='running' then recognized=true; $running=(value.to_i==1) end
+  if par=='rec' then recognized=true; $minetti_r=value.to_i end
   if par=='weight' then recognized=true; $body_mass=value.to_f end
   if par=='filtering' then recognized=true; $osc_h=value.to_f end
   if par=='xy_filtering' then recognized=true; $xy_filter=value.to_f end
