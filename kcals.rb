@@ -192,8 +192,8 @@ def init_globals
   $nominal_h = nil # nominal distance; is internally in meters, but specified in input as
                    # miles or km, depending on $metric; actual distances are scaled to make total
                    # equal to this value
-  $my_h = nil # distance for setting expected pace
-  $my_t = nil # time for setting expected pace
+
+  $split_energy_at = nil # horizontal distance at which to print out an intermediate energy
 
   $server_max = 70000.0 # rough maximum, in meters, on size of routes for CGI version, to avoid overload
   $server_max_points = 2000 # and max number of points
@@ -286,12 +286,6 @@ def integrate_gain_and_energy(hv,rescale)
   iota_sum = 0.0
   iota_sum_sq = 0.0
   baumel_si = 0.0 # compute this directly as a check
-  have_pace = !$my_h.nil? && !$my_t.nil? && $my_t!=0.0
-  if have_pace then
-    power = $my_h*$body_mass*minetti(0.0)/$my_t # in watts
-  else
-    power = nil
-  end
   t = 0.0 # integrated time, in seconds
   h_reintegrated = 0.0 # if rescale!=1, this should be the same as nominal_h
   k = 0
@@ -314,9 +308,8 @@ def integrate_gain_and_energy(hv,rescale)
       dc = dd*$body_mass*minetti(i)
            # in theory it matters whether we use dd or dh here; I think from Minetti's math it's dd
       c = c+dc
-      if !power.nil? then
-        t=t+dc/power
-        hv[k] = h,v,t
+      if not ($split_energy_at.nil?) and d-dd<$split_energy_at_m and d>$split_energy_at_m then
+        $stderr.print "at d=#{$split_energy_at}, energy=#{(c*0.0002388459).round} kcals\n" # fixme -- shouldn't print directly
       end
       k=k+1
     end
@@ -332,7 +325,7 @@ def integrate_gain_and_energy(hv,rescale)
   e_q = h*$body_mass*(b0+b1*i_mean+b2*i_rms)
   cf = (c-h*$body_mass*minetti(0.0))/c
   stats = {'c'=>c,'h'=>h,'d'=>d,'gain'=>gain,'i_rms'=>i_rms,'i_mean'=>i_mean,'e_q'=>e_q,
-           'cf'=>cf,'baumel_si'=>baumel_si,'power'=>power,
+           'cf'=>cf,'baumel_si'=>baumel_si,
            't'=>t}
   return [stats,hv]
 end
@@ -811,8 +804,12 @@ def set_param(par,value,where,s)
   if par=='infile' then recognized=true; $infile=value end
   if par=='test' then recognized=true; $test=value end
   if par=='nominal_h' then recognized=true; $nominal_h = (value.to_f)*distance_unit() end
-  if par=='my_h' then recognized=true; $my_h = (value.to_f)*distance_unit() end
-  if par=='my_t' then recognized=true; $my_t = time_string_to_seconds(value) end
+  if par=='split_energy_at' then
+    recognized=true;
+    $split_energy_at = value.to_f
+    $split_energy_at_m =$split_energy_at*1000.0 # in meters, assuming we're using metric
+    if !$metric then $split_energy_at_m=$split_energy_at_m*1.609344 end # convert miles to metric
+  end
   if par=='format' then
     recognized=true
     $format=value

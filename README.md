@@ -91,9 +91,7 @@ Parameters are:
 
   nominal_h -- the nominal distance of the run, in miles if metric=0, km if metric=1; see below
 
-  my_h -- a distance, in miles if metric=0, km if metric=1; used for estimating times, see below
-
-  my_t -- a time, in h:m:s, m:s, or s format; used for estimating times, see below
+  split_energy_at -- at this distance, print out the energy used so far; distance is in miles if metric=0, km if metric=1; for use in predicting split times (see below)
 
   rec -- set to 0 to use the cost of running directly from treadmill studies, 1 to use a modified "recreational" version that is usually more realistic; default is 1
 
@@ -171,28 +169,16 @@ on the total horizontal distance. In the example above, there will also be a sli
 decrease in energy consumption because all of the slopes go down a little. The scaling factor
 is taken into account in the output file profile.csv, but not in path.csv.
 
-## Estimating times
+## Estimating split times
 
-If the parameters my_h and my_t are set, then they are used as a reference distance and time for
-estimating how fast the runner runs. For example, if metric=0, then I can put in 
-my_h=13.11 and my_t=1:39:21 to represent my half-marathon pace. These figures are used to estimate
-the runner's power output in watts. The power, in turn, is used to estimate times. If my_h and my_t
-are both set, then split times will be estimated. Example:
+For example, suppose that the run is 6.40 miles, and you want to predict your split time at 4.67 miles.
+Then you would do something like this:
 
-`kcals.rb dem=1 nominal_h=13.11 my_h=13.11 my_t=1:39:21 chino_hills_half_marathon.gpx`
+`kcals.rb dem=1 split_energy_at=4.67 my_run.gpx`
 
-This feature is experimental and should not be trusted too much. It seems to give reasonable answers
-in some cases, but for runs with a lot of very steep climbing it can be wildly off. For example,
-I used my time on a slighly hilly (2% CF) 15.2 mile loop as a reference point, which resulted in a
-power of about 690-780 W (the latter representing my PR pace). With this reference point, I estimated
-the time it would take me to do a 16.7-mile run with a 35% CF (7300' of elevation gain), and the
-prediction was 3.5-4 hours. In reality, the latter run took me almost 7 hours. I think what's going
-on here is that for runs with lots of very steep hills, only a certain fraction of the
-mileage may actually be runnable, so my actual pace is dramatically slower. Even on a downhill,
-it may be difficult to maintain a running pace of the terrain is very steep and has lots of rocks,
-twists and turns, etc. The lab data that kcals is based on was all done using a treadmill, and a
-person on a treadmill can tear down steep grades at speeds they would never be able to manage on
-a trail.
+If this tells you that the energy used up to this point is a value equal to 77% of the total (slightly
+more than would have been predicted based purely on mileage), then you can estimate that your split
+time will be .77 of your total time.
 
 ## Installing
 
