@@ -98,7 +98,7 @@ Parameters are:
 ## Filtering
 
 The parameters filtering and xy_filtering both represent horizontal distances
-in units of meters. Their defaults values are 60 and 30, respectively. These are meant to get rid of bogus
+in units of meters. Their defaults values are 200 and 30, respectively. These are meant to get rid of bogus
 oscillations in the data. Any elevation (z) changes that occur over horizontal distances less
 than the value of "filtering" will tend to get filtered out, and likewise any horizontal motion that occurs
 over horizontal distances less than the value of "xy_filtering."
@@ -136,6 +136,7 @@ My rules of thumb for setting the filtering are as follows:
 
  * For very steep runs with a lot of elevation gain, in rugged terrain, it's necessary to use a
      larger filtering value of about 200 m. Otherwise the energy estimates are much too high.
+     This is the software's default.
 
 The mileage derived from a GPS track can vary quite a bit depending on the resolution of the GPS data.
 Higher resolution increases the mileage, because small wiggles get counted in. This has a big effect on
